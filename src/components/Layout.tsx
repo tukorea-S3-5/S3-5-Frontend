@@ -20,7 +20,7 @@ export const PageContainer = styled.div`
   padding-bottom: 80px; /* 하단 네비게이션 공간 확보 */
 `;
 
-export const Header = styled.header`
+export const HeaderWrapper = styled.header`
   position: sticky;
   top: 0;
   z-index: 100;
@@ -32,7 +32,7 @@ export const Header = styled.header`
   justify-content: space-between;
 `;
 
-export const BottomNav = styled.nav`
+export const BottomNavWrapper = styled.nav`
   position: fixed;
   bottom: 0;
   left: 50%;

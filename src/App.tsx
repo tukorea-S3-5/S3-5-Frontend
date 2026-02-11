@@ -1,14 +1,12 @@
-import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from 'styled-components';
 import { GlobalStyle } from './styles/GlobalStyle';
 import { theme } from './styles/theme';
-import { AppContainer, BottomNav, NavItem } from './components/Layout';
+import { AppContainer } from './components/Layout';
+import { BottomNav } from './components';
 import HomePage from './pages/HomePage';
 
 function AppContent() {
-  const location = useLocation();
-  const navigate = useNavigate();
-
   const navItems = [
     { path: '/', label: '홈', icon: '🏠' },
     { path: '/exercises', label: '운동', icon: '💪' },
@@ -25,18 +23,7 @@ function AppContent() {
         <Route path="/profile" element={<div style={{ padding: '20px' }}>프로필 페이지</div>} />
       </Routes>
 
-      <BottomNav>
-        {navItems.map((item) => (
-          <NavItem
-            key={item.path}
-            $active={location.pathname === item.path}
-            onClick={() => navigate(item.path)}
-          >
-            <span style={{ fontSize: '24px' }}>{item.icon}</span>
-            <span>{item.label}</span>
-          </NavItem>
-        ))}
-      </BottomNav>
+      <BottomNav items={navItems} />
     </AppContainer>
   );
 }
