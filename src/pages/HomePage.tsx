@@ -1,14 +1,9 @@
 import styled from 'styled-components';
-import { Header, Button } from '../components/index';
+import { Button } from '../components/index';
 
 const HomePage = () => {
   return (
     <Container>
-      <Header
-        weekInfo="40주차"
-        onNotificationClick={() => console.log('알림')}
-        onSettingsClick={() => console.log('설정')}
-      />
 
       <Content>
         <WelcomeSection>
