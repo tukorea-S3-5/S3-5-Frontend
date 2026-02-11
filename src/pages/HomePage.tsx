@@ -1,54 +1,74 @@
 import styled from 'styled-components';
+import { Button } from '../components/index';
 
 const HomePage = () => {
   return (
     <Container>
-      <WelcomeSection>
-        <Title>안녕하세요! 👋</Title>
-        <Subtitle>오늘도 건강한 하루 보내세요</Subtitle>
-      </WelcomeSection>
 
-      <ExerciseCard>
-        <CardHeader>
-          <CardTitle>오늘의 운동</CardTitle>
-          <Badge>추천</Badge>
-        </CardHeader>
-        <CardContent>
-          <ExerciseImage>🤰</ExerciseImage>
-          <ExerciseInfo>
-            <ExerciseName>임산부 요가</ExerciseName>
-            <ExerciseTime>15분 • 초급</ExerciseTime>
-          </ExerciseInfo>
-        </CardContent>
-        <StartButton>시작하기</StartButton>
-      </ExerciseCard>
+      <Content>
+        <WelcomeSection>
+          <Title>안녕하세요! 👋</Title>
+          <Subtitle>오늘도 건강한 하루 보내세요</Subtitle>
+        </WelcomeSection>
 
-      <Section>
-        <SectionTitle>운동 카테고리</SectionTitle>
-        <CategoryGrid>
-          <CategoryCard>
-            <CategoryIcon>🧘‍♀️</CategoryIcon>
-            <CategoryName>요가</CategoryName>
-          </CategoryCard>
-          <CategoryCard>
-            <CategoryIcon>🚶‍♀️</CategoryIcon>
-            <CategoryName>걷기</CategoryName>
-          </CategoryCard>
-          <CategoryCard>
-            <CategoryIcon>💪</CategoryIcon>
-            <CategoryName>스트레칭</CategoryName>
-          </CategoryCard>
-          <CategoryCard>
-            <CategoryIcon>🏃‍♀️</CategoryIcon>
-            <CategoryName>유산소</CategoryName>
-          </CategoryCard>
-        </CategoryGrid>
-      </Section>
+        <ExerciseCard>
+          <CardHeader>
+            <CardTitle>오늘의 운동</CardTitle>
+            <BadgeStyled>추천</BadgeStyled>
+          </CardHeader>
+          <CardContent>
+            <ExerciseImage>🤰</ExerciseImage>
+            <ExerciseInfo>
+              <ExerciseName>임산부 요가</ExerciseName>
+              <ExerciseTime>15분 • 초급</ExerciseTime>
+            </ExerciseInfo>
+          </CardContent>
+          <Button
+            size="long"
+            variant="primary"
+            onClick={() => console.log('운동 시작')}
+          >
+            시작하기
+          </Button>
+        </ExerciseCard>
+
+        <Section>
+          <SectionTitle>운동 카테고리</SectionTitle>
+          <CategoryGrid>
+            <CategoryCard onClick={() => console.log('요가')}>
+              <CategoryIcon>🧘‍♀️</CategoryIcon>
+              <CategoryName>요가</CategoryName>
+            </CategoryCard>
+            <CategoryCard onClick={() => console.log('걷기')}>
+              <CategoryIcon>🚶‍♀️</CategoryIcon>
+              <CategoryName>걷기</CategoryName>
+            </CategoryCard>
+            <CategoryCard onClick={() => console.log('스트레칭')}>
+              <CategoryIcon>💪</CategoryIcon>
+              <CategoryName>스트레칭</CategoryName>
+            </CategoryCard>
+            <CategoryCard onClick={() => console.log('유산소')}>
+              <CategoryIcon>🏃‍♀️</CategoryIcon>
+              <CategoryName>유산소</CategoryName>
+            </CategoryCard>
+          </CategoryGrid>
+        </Section>
+      </Content>
     </Container>
   );
 };
 
 const Container = styled.div`
+  width: 100%;
+  max-width: 430px;
+  min-height: 100vh;
+  background: ${({ theme }) => theme.colors.background};
+  margin: 0 auto;
+  position: relative;
+  padding-bottom: 80px;
+`;
+
+const Content = styled.div`
   padding: ${({ theme }) => theme.spacing.md};
 `;
 
@@ -88,7 +108,7 @@ const CardTitle = styled.h2`
   color: ${({ theme }) => theme.colors.text.primary};
 `;
 
-const Badge = styled.span`
+const BadgeStyled = styled.span`
   background-color: ${({ theme }) => theme.colors.primary};
   color: white;
   padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.sm};
@@ -133,21 +153,6 @@ const ExerciseTime = styled.p`
   color: ${({ theme }) => theme.colors.text.secondary};
 `;
 
-const StartButton = styled.button`
-  width: 100%;
-  background-color: ${({ theme }) => theme.colors.primary};
-  color: white;
-  padding: ${({ theme }) => theme.spacing.md};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  font-size: ${({ theme }) => theme.fontSize.md};
-  font-weight: ${({ theme }) => theme.fontWeight.semibold};
-  transition: opacity 0.2s;
-
-  &:active {
-    opacity: 0.8;
-  }
-`;
-
 const Section = styled.section`
   margin-bottom: ${({ theme }) => theme.spacing.xl};
 `;
@@ -175,6 +180,8 @@ const CategoryCard = styled.button`
   gap: ${({ theme }) => theme.spacing.sm};
   box-shadow: ${({ theme }) => theme.shadows.sm};
   transition: transform 0.2s, box-shadow 0.2s;
+  border: none;
+  cursor: pointer;
 
   &:active {
     transform: scale(0.98);

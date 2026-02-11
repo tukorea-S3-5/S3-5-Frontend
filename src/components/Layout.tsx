@@ -1,6 +1,39 @@
+import React from 'react';
 import styled from 'styled-components';
+import Header from './Header';
+import BottomNav from './BottomNav';
 
-export const AppContainer = styled.div`
+interface LayoutProps {
+  children: React.ReactNode;
+  showHeader?: boolean;
+  showBottomNav?: boolean;
+  weekInfo?: string;
+}
+
+const Layout: React.FC<LayoutProps> = ({
+  children,
+  showHeader = true,
+  showBottomNav = true,
+  weekInfo = '40주차',
+}) => {
+  return (
+    <AppContainer>
+      {showHeader && (
+        <Header
+          weekInfo={weekInfo}
+          onNotificationClick={() => console.log('알림')}
+          onSettingsClick={() => console.log('설정')}
+        />
+      )}
+
+      <PageContainer>{children}</PageContainer>
+
+      {showBottomNav && <BottomNav />}
+    </AppContainer>
+  );
+};
+
+const AppContainer = styled.div`
   max-width: ${({ theme }) => theme.layout.maxWidth};
   min-height: ${({ theme }) => theme.layout.minHeight};
   margin: 0 auto;
@@ -14,53 +47,10 @@ export const AppContainer = styled.div`
   }
 `;
 
-export const PageContainer = styled.div`
+const PageContainer = styled.div`
   padding: ${({ theme }) => theme.spacing.md};
   min-height: 100vh;
   padding-bottom: 80px; /* 하단 네비게이션 공간 확보 */
 `;
 
-export const Header = styled.header`
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background-color: ${({ theme }) => theme.colors.background};
-  padding: ${({ theme }) => theme.spacing.md};
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-`;
-
-export const BottomNav = styled.nav`
-  position: fixed;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: ${({ theme }) => theme.layout.maxWidth};
-  width: 100%;
-  background-color: ${({ theme }) => theme.colors.background};
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-  display: flex;
-  justify-content: space-around;
-  padding: ${({ theme }) => theme.spacing.sm} 0;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
-`;
-
-export const NavItem = styled.button<{ $active?: boolean }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: ${({ theme }) => theme.spacing.xs};
-  padding: ${({ theme }) => theme.spacing.sm};
-  color: ${({ theme, $active }) => 
-    $active ? theme.colors.primary : theme.colors.text.secondary};
-  font-size: ${({ theme }) => theme.fontSize.xs};
-  font-weight: ${({ theme, $active }) => 
-    $active ? theme.fontWeight.semibold : theme.fontWeight.regular};
-  transition: color 0.2s;
-  
-  &:active {
-    opacity: 0.7;
-  }
-`;
+export default Layout;
