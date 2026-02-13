@@ -4,6 +4,7 @@ import { GlobalStyle } from './styles/GlobalStyle';
 import { theme } from './styles/theme';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
+import ExerciseListPage from './pages/ExerciseList/ExerciseListPage';
 
 function App() {
   return (
@@ -13,7 +14,7 @@ function App() {
         <Layout>
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/exercises" element={<div style={{ padding: '20px' }}>운동 페이지</div>} />
+            <Route path="/exercises" element={<ExerciseListPage />} />
             <Route path="/record" element={<div style={{ padding: '20px' }}>기록 페이지</div>} />
             <Route path="/profile" element={<div style={{ padding: '20px' }}>프로필 페이지</div>} />
           </Routes>
