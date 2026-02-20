@@ -41,11 +41,20 @@ const DifficultyChip: React.FC<DifficultyChipProps> = ({ level }) => {
 };
 
 const Chip = styled.span<{ $bgColor: string; $textColor: string }>`
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  align-self: flex-start;  
+  width: fit-content;
+  white-space: nowrap; 
+
   background: ${props => props.$bgColor};
   color: ${props => props.$textColor};
-  padding: 4px 10px;
-  border-radius: 12px;
+
+  padding: 4px 12px;
+  border-radius: 10px;
+
   font-size: 12px;
   font-weight: 600;
 `;

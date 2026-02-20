@@ -7,7 +7,7 @@ interface Exercise {
     id: string;
     title: string;
     description: string;
-    category: '요가' | '근력' | '유산소' | '스트레칭';
+    category: '요가' | '근력 운동' | '유산소' | '필라테스'| '기능성/이완';
     difficulty: '초급' | '중급' | '고급';
 }
 
