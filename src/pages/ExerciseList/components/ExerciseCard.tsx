@@ -5,24 +5,11 @@ interface ExerciseCardProps {
   id: string;
   title: string;
   description: string;
-  category:
-  | '유산소'
-  | '요가'
-  | '필라테스'
-  | '근력 운동'
-  | '기능성/이완';
+  category: '유산소' | '요가' | '필라테스' | '근력 운동' | '기능성/이완';
   difficulty?: '초급' | '중급' | '고급';
   selected?: boolean;
   onClick?: () => void;
 }
-
-const CATEGORY_STYLE = {
-  '유산소': { bg: '#F3E6E2', text: '#FF5A5A' },
-  '요가': { bg: '#F3E6E2', text: '#FF5A5A' },
-  '필라테스': { bg: '#F3E6E2', text: '#FF5A5A' },
-  '근력 운동': { bg: '#F3E6E2', text: '#FF5A5A' },
-  '기능성/이완': { bg: '#F3E6E2', text: '#FF5A5A' },
-} as const;
 
 const ExerciseCard: React.FC<ExerciseCardProps> = ({
   title,
@@ -32,24 +19,17 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({
   selected = false,
   onClick,
 }) => {
-  const style = CATEGORY_STYLE[category];
-
   return (
     <CardContainer onClick={onClick} $selected={selected}>
       {selected && <CheckMark>✓</CheckMark>}
 
-      <CategoryIcon $bgColor={style.bg} $textColor={style.text}>
-        {category}
-      </CategoryIcon>
+      <CategoryIcon>{category}</CategoryIcon>
 
       <CardContent>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
-
         {difficulty && (
-          <DifficultyChip level={difficulty}>
-            {difficulty}
-          </DifficultyChip>
+          <DifficultyChip $level={difficulty}>{difficulty}</DifficultyChip>
         )}
       </CardContent>
     </CardContainer>
@@ -58,120 +38,95 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
 export default ExerciseCard;
 
-
 const CardContainer = styled.div<{ $selected: boolean }>`
   position: relative;
-  background: white;
-  border-radius: 16px;
-  padding: 20px;
+  background: ${({ theme }) => theme.colors.white};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  padding: ${({ theme }) => theme.spacing.md};
   display: flex;
-  gap: 16px;
-
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  gap: ${({ theme }) => theme.spacing.md};
+  box-shadow: ${({ theme }) => theme.shadows.sm};
   cursor: pointer;
   transition: all 0.2s ease;
-
-  border: 2px solid
-    ${props => (props.$selected ? '#FF6B6B' : 'transparent')};
+  border: 2px solid ${({ theme, $selected }) =>
+    $selected ? theme.colors.point : 'transparent'};
 
   &:hover {
-    transform: translateY(-2px);
+    transform:;
+    box-shadow: ${({ theme }) => theme.shadows.md};
   }
 `;
 
 const CheckMark = styled.div`
   position: absolute;
-  top: 12px;
-  right: 12px;
-
+  top: ${({ theme }) => theme.spacing.sm};
+  right: ${({ theme }) => theme.spacing.sm};
   width: 24px;
   height: 24px;
-  border-radius: 50%;
-
-  background: #FF6B6B;
-  color: white;
-
+  border-radius: ${({ theme }) => theme.borderRadius.round};
+  background: ${({ theme }) => theme.colors.point};
+  color: ${({ theme }) => theme.colors.white};
   display: flex;
   align-items: center;
   justify-content: center;
-
-  font-size: 14px;
-  font-weight: bold;
+  font-size: ${({ theme }) => theme.fontSize.sm};
+  font-weight: ${({ theme }) => theme.fontWeight.bold};
 `;
 
 const CategoryIcon = styled.div`
   width: 56px;
   height: 56px;
-
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  background: #F3E6E2; //todo:  light 테마색 적용
-  color: #FF5A5A;  //todo:  point 테마색 적용
-
-  border-radius: 16px;
-
-  font-size: 14px;
-  font-weight: 700;
-
+  background: ${({ theme }) => theme.colors.light};  /* light 테마색 */
+  color: ${({ theme }) => theme.colors.point};        /* point 테마색 */
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.fontSize.xs};
+  font-weight: ${({ theme }) => theme.fontWeight.bold};
   text-align: center;
   line-height: 1.2;
   padding: 6px;
-
-  flex-shrink: 0;
 `;
+
 const CardContent = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: ${({ theme }) => theme.spacing.xs};
 `;
 
 const CardTitle = styled.h4`
-  font-size: 18px;
-  font-weight: bold;
-  color: #333;
+  ${({ theme }) => theme.typography.heading3}
+  color: ${({ theme }) => theme.colors.text.primary};
   margin: 0;
 `;
 
 const CardDescription = styled.p`
-  font-size: 14px;
-  color: #666;
+  ${({ theme }) => theme.typography.body2}
+  color: ${({ theme }) => theme.colors.text.secondary};
   margin: 0;
-  line-height: 1.5;
 `;
 
-const DifficultyChip = styled.span<{ level: '초급' | '중급' | '고급' }>`
+const DifficultyChip = styled.span<{ $level: '초급' | '중급' | '고급' }>`
+  ${({ theme }) => theme.typography.caption}
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-
   width: fit-content;
   white-space: nowrap;
-
   padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  font-weight: ${({ theme }) => theme.fontWeight.semibold};
 
-  ${({ level }) => {
-    switch (level) {
+  ${({ theme, $level }) => {
+    switch ($level) {
       case '초급':
-        return `
-          background: #FFE5E5;
-          color: #FF6B6B;
-        `;
+        return `background: ${theme.colors.light}; color: ${theme.colors.point};`;
       case '중급':
-        return `
-          background: #FFF4E5;
-          color: #FF9800;
-        `;
+        return `background: #FFF4E5; color: ${theme.colors.warning};`;
       case '고급':
-        return `
-          background: #E8F5E9;
-          color: #4CAF50;
-        `;
+        return `background: #E8F5E9; color: ${theme.colors.success};`;
     }
   }}
 `;
