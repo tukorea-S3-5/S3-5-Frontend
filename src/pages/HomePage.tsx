@@ -4,7 +4,6 @@ import { Button } from '../components/index';
 const HomePage = () => {
   return (
     <Container>
-
       <Content>
         <WelcomeSection>
           <Title>안녕하세요! 👋</Title>
@@ -14,7 +13,7 @@ const HomePage = () => {
         <ExerciseCard>
           <CardHeader>
             <CardTitle>오늘의 운동</CardTitle>
-            <BadgeStyled>추천</BadgeStyled>
+            <Badge>추천</Badge>
           </CardHeader>
           <CardContent>
             <ExerciseImage>🤰</ExerciseImage>
@@ -23,11 +22,7 @@ const HomePage = () => {
               <ExerciseTime>15분 • 초급</ExerciseTime>
             </ExerciseInfo>
           </CardContent>
-          <Button
-            size="long"
-            variant="primary"
-            onClick={() => console.log('운동 시작')}
-          >
+          <Button size="long" variant="primary" onClick={() => console.log('운동 시작')}>
             시작하기
           </Button>
         </ExerciseCard>
@@ -60,8 +55,8 @@ const HomePage = () => {
 
 const Container = styled.div`
   width: 100%;
-  max-width: 430px;
-  min-height: 100vh;
+  max-width: ${({ theme }) => theme.layout.maxWidth};
+  min-height: ${({ theme }) => theme.layout.minHeight};
   background: ${({ theme }) => theme.colors.background};
   margin: 0 auto;
   position: relative;
@@ -77,19 +72,18 @@ const WelcomeSection = styled.div`
 `;
 
 const Title = styled.h1`
-  font-size: ${({ theme }) => theme.fontSize.xxl};
-  font-weight: ${({ theme }) => theme.fontWeight.bold};
+  ${({ theme }) => theme.typography.heading1}
   color: ${({ theme }) => theme.colors.text.primary};
   margin-bottom: ${({ theme }) => theme.spacing.xs};
 `;
 
 const Subtitle = styled.p`
-  font-size: ${({ theme }) => theme.fontSize.md};
+  ${({ theme }) => theme.typography.body1}
   color: ${({ theme }) => theme.colors.text.secondary};
 `;
 
 const ExerciseCard = styled.div`
-  background-color: ${({ theme }) => theme.colors.secondary};
+  background-color: ${({ theme }) => theme.colors.light};
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   padding: ${({ theme }) => theme.spacing.lg};
   margin-bottom: ${({ theme }) => theme.spacing.xl};
@@ -103,17 +97,16 @@ const CardHeader = styled.div`
 `;
 
 const CardTitle = styled.h2`
-  font-size: ${({ theme }) => theme.fontSize.lg};
-  font-weight: ${({ theme }) => theme.fontWeight.semibold};
+  ${({ theme }) => theme.typography.heading3}
   color: ${({ theme }) => theme.colors.text.primary};
 `;
 
-const BadgeStyled = styled.span`
-  background-color: ${({ theme }) => theme.colors.primary};
-  color: white;
+const Badge = styled.span`
+  ${({ theme }) => theme.typography.caption}
+  background-color: ${({ theme }) => theme.colors.point};
+  color: ${({ theme }) => theme.colors.white};
   padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.sm};
   border-radius: ${({ theme }) => theme.borderRadius.sm};
-  font-size: ${({ theme }) => theme.fontSize.xs};
   font-weight: ${({ theme }) => theme.fontWeight.medium};
 `;
 
@@ -126,7 +119,7 @@ const CardContent = styled.div`
 const ExerciseImage = styled.div`
   width: 80px;
   height: 80px;
-  background-color: white;
+  background-color: ${({ theme }) => theme.colors.white};
   border-radius: ${({ theme }) => theme.borderRadius.md};
   display: flex;
   align-items: center;
@@ -142,14 +135,13 @@ const ExerciseInfo = styled.div`
 `;
 
 const ExerciseName = styled.h3`
-  font-size: ${({ theme }) => theme.fontSize.lg};
-  font-weight: ${({ theme }) => theme.fontWeight.semibold};
+  ${({ theme }) => theme.typography.heading3}
   color: ${({ theme }) => theme.colors.text.primary};
   margin-bottom: ${({ theme }) => theme.spacing.xs};
 `;
 
 const ExerciseTime = styled.p`
-  font-size: ${({ theme }) => theme.fontSize.sm};
+  ${({ theme }) => theme.typography.body2}
   color: ${({ theme }) => theme.colors.text.secondary};
 `;
 
@@ -158,8 +150,7 @@ const Section = styled.section`
 `;
 
 const SectionTitle = styled.h2`
-  font-size: ${({ theme }) => theme.fontSize.lg};
-  font-weight: ${({ theme }) => theme.fontWeight.semibold};
+  ${({ theme }) => theme.typography.heading2}
   color: ${({ theme }) => theme.colors.text.primary};
   margin-bottom: ${({ theme }) => theme.spacing.md};
 `;
@@ -171,7 +162,7 @@ const CategoryGrid = styled.div`
 `;
 
 const CategoryCard = styled.button`
-  background-color: white;
+  background-color: ${({ theme }) => theme.colors.white};
   border-radius: ${({ theme }) => theme.borderRadius.md};
   padding: ${({ theme }) => theme.spacing.lg};
   display: flex;
@@ -194,8 +185,7 @@ const CategoryIcon = styled.div`
 `;
 
 const CategoryName = styled.span`
-  font-size: ${({ theme }) => theme.fontSize.md};
-  font-weight: ${({ theme }) => theme.fontWeight.medium};
+  ${({ theme }) => theme.typography.body1}
   color: ${({ theme }) => theme.colors.text.primary};
 `;
 
