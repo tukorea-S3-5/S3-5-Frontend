@@ -32,6 +32,7 @@ const Label = styled.label<{ $disabled: boolean }>`
   display: flex;
   align-items: center;
   gap: 10px;
+  position: relative;
   cursor: ${({ $disabled }) => ($disabled ? "not-allowed" : "pointer")};
   user-select: none;
 `;
