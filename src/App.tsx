@@ -1,19 +1,12 @@
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "styled-components";
 import { GlobalStyle } from "./styles/GlobalStyle";
 import { theme } from "./styles/theme";
 import Layout from "./components/Layout";
 import HomePage from "./pages/HomePage";
 import SplashPage from "./pages/SplashPage";
-
-// 헤더, 네비게이션 바 감싸는 레이아웃 컴포넌트
-const LayoutWrapper = () => {
-  return (
-    <Layout>
-      <Outlet />
-    </Layout>
-  );
-};
+import SafetyCheckPage from "./pages/Onboarding/SafetyCheckPage";
+import ExpertConsultPage from "./pages/Onboarding/ExpertConsultPage";
 
 function App() {
   return (
@@ -22,8 +15,12 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<SplashPage />} />
+          <Route path="/onboarding">
+            <Route path="safety" element={<SafetyCheckPage />} />
+            <Route path="expert" element={<ExpertConsultPage />} />
+          </Route>
 
-          <Route element={<LayoutWrapper />}>
+          <Route element={<Layout />}>
             <Route path="/home" element={<HomePage />} />
             <Route
               path="/exercises"

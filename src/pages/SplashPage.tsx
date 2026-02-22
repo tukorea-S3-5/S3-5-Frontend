@@ -8,7 +8,7 @@ const SplashPage = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      navigate("/home");
+      navigate("/onboarding/safety");
     }, 1500);
 
     return () => clearTimeout(timer);

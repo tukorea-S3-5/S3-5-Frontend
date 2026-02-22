@@ -9,6 +9,7 @@ export const theme = {
       secondary: "#666666",
       light: "#999999",
     },
+    box_border: "#FFD0C5",
     border: "#E0E0E0",
     error: "#FF4444",
     success: "#4CAF50",
