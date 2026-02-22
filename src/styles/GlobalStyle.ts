@@ -15,13 +15,10 @@ export const GlobalStyle = createGlobalStyle`
   }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-      sans-serif;
+    font-family: 'Apple SD Gothic Neo', -apple-system, BlinkMacSystemFont,
+      'Segoe UI', 'Helvetica Neue', sans-serif;
     background-color: #f5f5f5;
     overflow-x: hidden;
-    
-    /* 모바일 웹앱 느낌을 위한 스타일 */
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     user-select: none;
@@ -46,13 +43,11 @@ export const GlobalStyle = createGlobalStyle`
     color: inherit;
   }
 
-  /* 스크롤바 스타일 */
   ::-webkit-scrollbar {
     width: 0px;
     background: transparent;
   }
 
-  /* iOS 스타일 바운스 효과 제거 */
   body {
     overscroll-behavior-y: none;
   }

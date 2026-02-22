@@ -4,6 +4,7 @@ import { GlobalStyle } from "./styles/GlobalStyle";
 import { theme } from "./styles/theme";
 import Layout from "./components/Layout";
 import HomePage from "./pages/HomePage";
+import ExerciseListPage from "./pages/ExerciseList/ExerciseListPage";
 import SplashPage from "./pages/SplashPage";
 import SafetyCheckPage from "./pages/Onboarding/SafetyCheckPage";
 import ExpertConsultPage from "./pages/Onboarding/ExpertConsultPage";
@@ -22,10 +23,7 @@ function App() {
 
           <Route element={<Layout />}>
             <Route path="/home" element={<HomePage />} />
-            <Route
-              path="/exercises"
-              element={<div style={{ padding: "20px" }}>운동 페이지</div>}
-            />
+            <Route path="/exercises" element={<ExerciseListPage />} />
             <Route
               path="/record"
               element={<div style={{ padding: "20px" }}>기록 페이지</div>}

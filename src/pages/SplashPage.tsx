@@ -8,7 +8,7 @@ const SplashPage = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      navigate("/onboarding/safety");
+      navigate("/onbording/safety");
     }, 1500);
 
     return () => clearTimeout(timer);
@@ -33,7 +33,7 @@ const Container = styled.div`
   max-width: 430px;
   min-height: 100vh;
   margin: 0 auto;
-  background-color: ${({ theme }) => theme.colors.light_background};
+  background-color: #fff9f8;
 
   /* 정중앙 정렬 */
   display: flex;
