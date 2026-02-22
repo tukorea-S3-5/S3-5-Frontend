@@ -8,6 +8,7 @@ import ExerciseListPage from "./pages/ExerciseList/ExerciseListPage";
 import SplashPage from "./pages/SplashPage";
 import SafetyCheckPage from "./pages/Onboarding/SafetyCheckPage";
 import ExpertConsultPage from "./pages/Onboarding/ExpertConsultPage";
+import OnboardingLayout from "./pages/Onboarding/components/OnboardingLayout";
 
 function App() {
   return (
@@ -16,7 +17,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<SplashPage />} />
-          <Route path="/onboarding">
+          <Route path="/onboarding" element={<OnboardingLayout />}>
             <Route path="safety" element={<SafetyCheckPage />} />
             <Route path="expert" element={<ExpertConsultPage />} />
           </Route>

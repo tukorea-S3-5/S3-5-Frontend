@@ -2,20 +2,21 @@ import styled from "styled-components";
 import splashLogo from "../assets/icons/splash_logo.svg";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
+import { FullscreenFrame } from "./Onboarding/components/OnboardingLayout";
 
 const SplashPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      navigate("/onbording/safety");
+      navigate("/onboarding/safety");
     }, 1500);
 
     return () => clearTimeout(timer);
   }, [navigate]);
 
   return (
-    <Container>
+    <FullscreenFrame>
       <ContentWrapper>
         {/* 로고 아이콘 */}
         <LogoIcon src={splashLogo} alt="Momfit Logo" />
@@ -23,23 +24,9 @@ const SplashPage = () => {
         {/* 서브타이틀 */}
         <Subtitle>임산부를 위한 맞춤 운동 가이드</Subtitle>
       </ContentWrapper>
-    </Container>
+    </FullscreenFrame>
   );
 };
-
-// 컨테이너 스타일
-const Container = styled.div`
-  width: 100%;
-  max-width: 430px;
-  min-height: 100vh;
-  margin: 0 auto;
-  background-color: #fff9f8;
-
-  /* 정중앙 정렬 */
-  display: flex;
-  justify-content: center;
-  align-items: center;
-`;
 
 // 컨텐츠 싸개 스타일
 const ContentWrapper = styled.div`

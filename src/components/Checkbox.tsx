@@ -23,7 +23,7 @@ export default function Checkbox({
         onChange={(e) => onChange(e.target.checked)}
       />
       <Box aria-hidden="true" $checked={checked} $disabled={disabled} />
-      {label && <Text>{label}</Text>}
+      {label && <Text $checked={checked}>{label}</Text>}
     </Label>
   );
 }
@@ -43,14 +43,17 @@ const HiddenInput = styled.input`
 `;
 
 const Box = styled.span<{ $checked: boolean; $disabled: boolean }>`
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  min-width: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  border-radius: 5px;
   border: 1.5px solid
     ${({ theme, $disabled }) =>
-      $disabled ? "#ddd" : (theme?.colors?.box_border ?? "#FFB3B3")};
+      $disabled ? theme.colors.border : theme.colors.middle};
   background: ${({ $checked, theme }) =>
-    $checked ? (theme?.colors?.primary ?? "#FF6B6B") : "transparent"};
+    $checked ? theme.colors.primary : "transparent"};
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -60,7 +63,7 @@ const Box = styled.span<{ $checked: boolean; $disabled: boolean }>`
     content: "";
     width: 8px;
     height: 4px;
-    border: 2px solid white;
+    border: 2px solid ${({ theme }) => theme.colors.white};
     border-top: none;
     border-right: none;
     transform: translateY(-1px) rotate(-45deg);
@@ -69,7 +72,9 @@ const Box = styled.span<{ $checked: boolean; $disabled: boolean }>`
   }
 `;
 
-const Text = styled.span`
-  font-size: 12px;
-  color: ${({ theme }) => theme?.colors?.text?.secondary ?? "#666"};
+const Text = styled.span<{ $checked: boolean }>`
+  ${({ theme }) => theme.typography.label};
+  color: ${({ theme, $checked }) =>
+    $checked ? theme.colors.text.secondary : theme.colors.text.light};
+  transition: color 0.15s ease;
 `;

@@ -92,7 +92,7 @@ export const theme = {
       font-family: ${fontFamily};
       font-size: 12px;
       font-weight: 400;
-      line-height: 1.5;
+      line-height: 1.6;
     `,
     button: css`
       font-family: ${fontFamily};
