@@ -1,41 +1,41 @@
-import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import styled from 'styled-components';
+import React from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import styled from "styled-components";
 
 interface NavItemType {
-    path: string;
-    label: string;
-    icon: string;
+  path: string;
+  label: string;
+  icon: string;
 }
 
 interface BottomNavProps {
-    items?: NavItemType[];
+  items?: NavItemType[];
 }
 
 const defaultItems: NavItemType[] = [
-    { path: '/', label: '홈', icon: '🏠' },
-    { path: '/exercises', label: '운동', icon: '💪' },
-    { path: '/postnatal', label: '산후', icon: '😊' },
+  { path: "/home", label: "홈", icon: "🏠" },
+  { path: "/exercises", label: "운동", icon: "💪" },
+  { path: "/postnatal", label: "산후", icon: "😊" },
 ];
 
 const BottomNav: React.FC<BottomNavProps> = ({ items = defaultItems }) => {
-    const navigate = useNavigate();
-    const location = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-    return (
-        <Nav>
-            {items.map((item) => (
-                <NavItem
-                    key={item.path}
-                    $active={location.pathname === item.path}
-                    onClick={() => navigate(item.path)}
-                >
-                    <NavIcon>{item.icon}</NavIcon>
-                    <NavLabel>{item.label}</NavLabel>
-                </NavItem>
-            ))}
-        </Nav>
-    );
+  return (
+    <Nav>
+      {items.map((item) => (
+        <NavItem
+          key={item.path}
+          $active={location.pathname === item.path}
+          onClick={() => navigate(item.path)}
+        >
+          <NavIcon>{item.icon}</NavIcon>
+          <NavLabel>{item.label}</NavLabel>
+        </NavItem>
+      ))}
+    </Nav>
+  );
 };
 
 const Nav = styled.nav`
@@ -61,10 +61,10 @@ const NavItem = styled.button<{ $active: boolean }>`
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  opacity: ${props => props.$active ? 1 : 0.5};
+  opacity: ${(props) => (props.$active ? 1 : 0.5)};
   transition: opacity 0.2s;
   padding: 4px 12px;
-  
+
   &:hover {
     opacity: 1;
   }
