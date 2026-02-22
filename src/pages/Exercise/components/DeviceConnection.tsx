@@ -80,7 +80,7 @@ export default function DeviceConnection({
               color: '#fff',
               fontSize: 15,
               fontWeight: 700,
-              border: 'none',
+              border: '1px #FF5038',
               borderRadius: 12,
               cursor: 'pointer',
             }}

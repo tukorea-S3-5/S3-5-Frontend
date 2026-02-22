@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { Card, TabMenu } from '../../components';
 import ExerciseCard from './components/ExerciseCard';
-import noExercise from '@assets/icons/images/noexercise.png';
+import MOMI_empty from '@assets/icons/images/MOMI_empty.png';
 
 interface Exercise {
   id: string;
@@ -107,7 +107,7 @@ const ExerciseListPage: React.FC = () => {
       <ExerciseList>
         {exercises.length === 0 ? (
           <EmptyState>
-            <EmptyImage src={noExercise} alt="운동 없음" />
+            <EmptyImage src={MOMI_empty} alt="운동 없음" />
             <EmptyText>조건에 맞는 추천 운동이 없네요!{'\n'}오늘은 푹 쉬세요 🌸</EmptyText>
           </EmptyState>
         ) : (
