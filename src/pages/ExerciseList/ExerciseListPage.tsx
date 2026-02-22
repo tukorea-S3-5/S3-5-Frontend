@@ -9,8 +9,8 @@ interface Exercise {
   id: string;
   title: string;
   description: string;
-  category: '요가' | '근력 운동' | '유산소' | '필라테스' | '기능성/이완';
-  difficulty: '초급' | '중급' | '고급';
+  category: "요가" | "근력 운동" | "유산소" | "필라테스" | "기능성/이완";
+  difficulty: "초급" | "중급" | "고급";
 }
 
 const ExerciseListPage: React.FC = () => {
@@ -21,32 +21,32 @@ const ExerciseListPage: React.FC = () => {
   const exercisesByTab: Record<string, Exercise[]> = {
     추천: [
       {
-        id: '1',
-        title: '임신부 요가',
-        description: '유연성과 호흡을 중점으로 하는 부드러운 운동',
-        category: '요가',
-        difficulty: '초급',
+        id: "1",
+        title: "임신부 요가",
+        description: "유연성과 호흡을 중점으로 하는 부드러운 운동",
+        category: "요가",
+        difficulty: "초급",
       },
       {
-        id: '2',
-        title: '케겔 운동',
-        description: '골반저근 강화를 위한 필수 운동',
-        category: '근력 운동',
-        difficulty: '초급',
+        id: "2",
+        title: "케겔 운동",
+        description: "골반저근 강화를 위한 필수 운동",
+        category: "근력 운동",
+        difficulty: "초급",
       },
       {
-        id: '3',
-        title: '가벼운 걷기',
-        description: '임신 초기에 가장 안전하고 효과적인 유산소 운동',
-        category: '유산소',
-        difficulty: '초급',
+        id: "3",
+        title: "가벼운 걷기",
+        description: "임신 초기에 가장 안전하고 효과적인 유산소 운동",
+        category: "유산소",
+        difficulty: "초급",
       },
       {
-        id: '4',
-        title: '스트레칭',
-        description: '몸의 긴장을 풀고 유연성을 높이는 운동',
-        category: '기능성/이완',
-        difficulty: '초급',
+        id: "4",
+        title: "스트레칭",
+        description: "몸의 긴장을 풀고 유연성을 높이는 운동",
+        category: "기능성/이완",
+        difficulty: "초급",
       },
     ],
     주의: [],
@@ -54,18 +54,18 @@ const ExerciseListPage: React.FC = () => {
   };
 
   const tabs = [
-    { key: '추천', label: '추천', count: 7 },
-    { key: '주의', label: '주의', count: 1 },
-    { key: '비추천', label: '비추천', count: 4 },
+    { key: "추천", label: "추천", count: 7 },
+    { key: "주의", label: "주의", count: 1 },
+    { key: "비추천", label: "비추천", count: 4 },
   ];
 
   const exercises = exercisesByTab[selectedTab] ?? [];
 
   const handleExerciseClick = (exerciseId: string) => {
-    setSelectedExercises(prev =>
+    setSelectedExercises((prev) =>
       prev.includes(exerciseId)
-        ? prev.filter(id => id !== exerciseId)
-        : [...prev, exerciseId]
+        ? prev.filter((id) => id !== exerciseId)
+        : [...prev, exerciseId],
     );
   };
 
@@ -84,8 +84,8 @@ const ExerciseListPage: React.FC = () => {
 
       <Card variant="warning" icon="⚠️" title="운동 전 주의사항">
         <p>
-          운동 시작 전 반드시 담당 의사와 상담하세요. 출혈, 어지러움, 호흡곤란 등의
-          증상이 나타나면 즉시 중단하세요.
+          운동 시작 전 반드시 담당 의사와 상담하세요. 출혈, 어지러움, 호흡곤란
+          등의 증상이 나타나면 즉시 중단하세요.
         </p>
       </Card>
 
@@ -174,6 +174,7 @@ const EmptyImage = styled.img`
 `;
 
 const EmptyText = styled.p`
+
   ${({ theme }) => theme.typography.body1}
   color: ${({ theme }) => theme.colors.subtext};
   text-align: center;
@@ -203,8 +204,12 @@ const OutlineButton = styled.button`
   cursor: pointer;
   transition: all 0.2s;
 
-  &:hover { background: ${({ theme }) => theme.colors.light}; }
-  &:active { transform: scale(0.98); }
+  &:hover {
+    background: ${({ theme }) => theme.colors.light};
+  }
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 const FillButton = styled.button<{ disabled: boolean }>`
@@ -218,10 +223,14 @@ const FillButton = styled.button<{ disabled: boolean }>`
   ${({ theme }) => theme.typography.button}
   cursor: ${({ disabled }) => disabled ? 'not-allowed' : 'pointer'};
   transition: all 0.2s;
-  opacity: ${({ disabled }) => disabled ? 0.6 : 1};
+  opacity: ${({ disabled }) => (disabled ? 0.6 : 1)};
 
-  &:hover:not(:disabled) { filter: brightness(0.9); }
-  &:active:not(:disabled) { transform: scale(0.98); }
+  &:hover:not(:disabled) {
+    filter: brightness(0.9);
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
 `;
 
 export default ExerciseListPage;
