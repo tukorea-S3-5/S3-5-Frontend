@@ -1,9 +1,9 @@
-import React, { useState } from "react";
-import styled from "styled-components";
-import { Card, TabMenu } from "../../components";
-import ExerciseCard from "./components/ExerciseCard";
-import { theme } from "../../styles/theme";
-import noExercise from "../../assets/icons/images/noexercise.png";
+import React, { useState } from 'react';
+import styled from 'styled-components';
+import { useNavigate } from 'react-router-dom';
+import { Card, TabMenu } from '../../components';
+import ExerciseCard from './components/ExerciseCard';
+import MOMI_empty from '@assets/icons/images/MOMI_empty.png';
 
 interface Exercise {
   id: string;
@@ -14,10 +14,10 @@ interface Exercise {
 }
 
 const ExerciseListPage: React.FC = () => {
-  const [selectedTab, setSelectedTab] = useState<string>("추천");
+  const navigate = useNavigate();
+  const [selectedTab, setSelectedTab] = useState<string>('추천');
   const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
 
-  // 탭별로 exercises를 받아오는 구조 — 현재는 추천만 데이터 있음
   const exercisesByTab: Record<string, Exercise[]> = {
     추천: [
       {
@@ -69,6 +69,15 @@ const ExerciseListPage: React.FC = () => {
     );
   };
 
+  const handleStartAll = () => {
+    navigate('/exercise', { state: { exercises } });
+  };
+
+  const handleStartSelected = () => {
+    const selected = exercises.filter(e => selectedExercises.includes(e.id));
+    navigate('/exercise', { state: { exercises: selected } });
+  };
+
   return (
     <Container>
       <Title>오늘의 추천 운동</Title>
@@ -92,16 +101,17 @@ const ExerciseListPage: React.FC = () => {
       <TabMenu
         tabs={tabs}
         activeTab={selectedTab}
-        onTabChange={(key) => setSelectedTab(key)}
+        onTabChange={(key) => {
+        setSelectedTab(key); //탭 전환 시 선택 초기화
+        setSelectedExercises([]);
+   }}
       />
 
       <ExerciseList>
         {exercises.length === 0 ? (
           <EmptyState>
-            <EmptyImage src={noExercise} alt="운동 없음" />
-            <EmptyText>
-              조건에 맞는 추천 운동이 없네요!{"\n"}오늘은 푹 쉬세요 🌸
-            </EmptyText>
+            <EmptyImage src={MOMI_empty} alt="운동 없음" />
+            <EmptyText>조건에 맞는 추천 운동이 없네요!{'\n'}오늘은 푹 쉬세요 🌸</EmptyText>
           </EmptyState>
         ) : (
           exercises.map((exercise) => (
@@ -121,12 +131,13 @@ const ExerciseListPage: React.FC = () => {
 
       {exercises.length > 0 && (
         <ButtonArea>
-          <ResetButton onClick={() => setSelectedExercises([])}>
-            전체 시작
-          </ResetButton>
-          <StartButton disabled={selectedExercises.length === 0}>
+          <OutlineButton onClick={handleStartAll}>전체 시작</OutlineButton>
+          <FillButton
+            disabled={selectedExercises.length === 0}
+            onClick={handleStartSelected}
+          >
             선택한 운동 시작
-          </StartButton>
+          </FillButton>
         </ButtonArea>
       )}
     </Container>
@@ -138,7 +149,7 @@ const Container = styled.div`
 `;
 
 const Title = styled.h1`
-  ${theme.typography.heading1}
+  ${({ theme }) => theme.typography.heading1}
   color: ${({ theme }) => theme.colors.point};
   margin: 0 0 ${({ theme }) => theme.spacing.lg} 0;
 `;
@@ -166,7 +177,8 @@ const EmptyImage = styled.img`
 `;
 
 const EmptyText = styled.p`
-  ${theme.typography.body1}
+
+  ${({ theme }) => theme.typography.body1}
   color: ${({ theme }) => theme.colors.subtext};
   text-align: center;
   white-space: pre-line;
@@ -184,14 +196,14 @@ const ButtonArea = styled.div`
   gap: ${({ theme }) => theme.spacing.sm};
 `;
 
-const ResetButton = styled.button`
+const OutlineButton = styled.button`
   flex: 1;
   padding: ${({ theme }) => theme.spacing.md};
   border-radius: ${({ theme }) => theme.borderRadius.md};
   border: 1.5px solid ${({ theme }) => theme.colors.point};
   background: transparent;
   color: ${({ theme }) => theme.colors.point};
-  ${theme.typography.button}
+  ${({ theme }) => theme.typography.button}
   cursor: pointer;
   transition: all 0.2s;
 
@@ -203,7 +215,7 @@ const ResetButton = styled.button`
   }
 `;
 
-const StartButton = styled.button<{ disabled: boolean }>`
+const FillButton = styled.button<{ disabled: boolean }>`
   flex: 1;
   padding: ${({ theme }) => theme.spacing.md};
   border-radius: ${({ theme }) => theme.borderRadius.md};
@@ -211,8 +223,8 @@ const StartButton = styled.button<{ disabled: boolean }>`
   background: ${({ theme, disabled }) =>
     disabled ? theme.colors.middle : theme.colors.point};
   color: ${({ theme }) => theme.colors.white};
-  ${theme.typography.button}
-  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
+  ${({ theme }) => theme.typography.button}
+  cursor: ${({ disabled }) => disabled ? 'not-allowed' : 'pointer'};
   transition: all 0.2s;
   opacity: ${({ disabled }) => (disabled ? 0.6 : 1)};
 
