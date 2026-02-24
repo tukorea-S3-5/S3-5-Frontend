@@ -103,6 +103,7 @@ export default function ExercisePage() {
   }, [playState]);
 
   const startCdModal = (type: 'next' | 'earlyStop') => {
+    if (cdRef.current) clearInterval(cdRef.current);
     setCdModal({ type, countdown: 5 });
     let count = 5;
     cdRef.current = setInterval(() => {
