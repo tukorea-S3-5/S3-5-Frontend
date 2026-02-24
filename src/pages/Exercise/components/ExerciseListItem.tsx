@@ -14,7 +14,7 @@ export default function ExerciseListItem({
   onClick,
 }: ExerciseListItemProps) {
   return (
-    <Item $active={isActive} onClick={onClick}>
+    <Item type="button" $active={isActive} onClick={onClick}>
       <Badge $active={isActive}>{index}</Badge>
       <Info>
         <Title $active={isActive}>{title}</Title>
