@@ -10,7 +10,7 @@ import SplashPage from "./pages/SplashPage";
 import SafetyCheckPage from "./pages/Onboarding/SafetyCheckPage";
 import ExpertConsultPage from "./pages/Onboarding/ExpertConsultPage";
 import OnboardingLayout from "./pages/Onboarding/components/OnboardingLayout";
-
+import ReportPage from "./pages/Exercise/ReportPage";
 
 function App() {
   return (
@@ -28,10 +28,11 @@ function App() {
             <Route path="/home" element={<HomePage />} />
             <Route path="/exercises" element={<ExerciseListPage />} />
             <Route path="/exercise" element={<ExercisePage />} />
+            <Route path="/report" element={<ReportPage />} />
             <Route path="/record" element={<div style={{ padding: '20px' }}>기록 페이지</div>} />
             <Route path="/profile" element={<div style={{ padding: '20px' }}>프로필 페이지</div>} />
-          </Routes>
-        </Layout>
+          </Route>
+        </Routes>
       </BrowserRouter>
     </ThemeProvider>
   );
