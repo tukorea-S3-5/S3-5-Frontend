@@ -176,9 +176,9 @@ export function deleteJson<TResponse>(
 let accessToken: string | null = null;
 
 // refresh 실패 시 강제 로그아웃을 위한 콜백함수
-let onAuthFail: (() => void) | null = null;
+let onAuthFail: (() => void | Promise<void>) | null = null;
 
-export function setOnAuthFail(handler: (() => void) | null) {
+export function setOnAuthFail(handler: (() => void | Promise<void>) | null) {
   onAuthFail = handler;
 }
 
