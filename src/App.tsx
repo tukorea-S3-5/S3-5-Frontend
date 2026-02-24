@@ -5,6 +5,7 @@ import { theme } from "./styles/theme";
 import Layout from "./components/Layout";
 import HomePage from "./pages/HomePage";
 import ExerciseListPage from "./pages/ExerciseList/ExerciseListPage";
+import ExercisePage from "./pages/Exercise/ExercisePage";
 import SplashPage from "./pages/SplashPage";
 import SafetyCheckPage from "./pages/Onboarding/SafetyCheckPage";
 import ExpertConsultPage from "./pages/Onboarding/ExpertConsultPage";
@@ -16,6 +17,7 @@ import LoginPage from "./pages/Auth/LoginPage";
 import SignupPage from "./pages/Auth/SignupPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import LoadingOverlay from "./components/LoadingOverlay";
+import ReportPage from "./pages/Exercise/ReportPage";
 
 function App() {
   return (
@@ -33,6 +35,7 @@ function AppRoutes() {
   const [isAuthLoaded, setIsAuthLoaded] = useState(false);
   const [showBootLoading, setShowBootLoading] = useState(false);
 
+  // 새로고침 로딩 및 인증 여부 확인
   useEffect(() => {
     const t = window.setTimeout(() => {
       setShowBootLoading(true);
@@ -50,6 +53,7 @@ function AppRoutes() {
     return () => window.clearTimeout(t);
   }, []);
 
+  // 새로고침시 refresh 토큰으로 새로운 access 토큰 발급
   useEffect(() => {
     setOnAuthFail(async () => {
       try {
@@ -71,11 +75,14 @@ function AppRoutes() {
 
   return (
     <Routes>
+      {/* 공개 라우트 */}
       <Route path="/" element={<SplashPage />} />
       <Route path="/onboarding" element={<OnboardingLayout />}>
         <Route path="safety" element={<SafetyCheckPage />} />
         <Route path="expert" element={<ExpertConsultPage />} />
       </Route>
+
+      {/* 인증 라우트(헤더/바텀네비 숨김) */}
       <Route
         path="/auth"
         element={<Layout showHeader={false} showBottomNav={false} />}
@@ -84,10 +91,13 @@ function AppRoutes() {
         <Route path="signup" element={<SignupPage />} />
       </Route>
 
+      {/* 앱 내부 라우트 */}
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route path="/home" element={<HomePage />} />
           <Route path="/exercises" element={<ExerciseListPage />} />
+          <Route path="/exercise" element={<ExercisePage />} />
+          <Route path="/report" element={<ReportPage />} />
           <Route
             path="/record"
             element={<div style={{ padding: "20px" }}>기록 페이지</div>}
