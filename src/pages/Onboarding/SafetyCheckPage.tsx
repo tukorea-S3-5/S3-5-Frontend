@@ -70,7 +70,7 @@ export default function SafetyCheckPage() {
           size="long"
           disabled={!agreed}
           onClick={() => {
-            // navigate("/login");
+            navigate("/auth/login");
           }}
         >
           서비스 시작하기
