@@ -9,11 +9,13 @@ import SplashPage from "./pages/SplashPage";
 import SafetyCheckPage from "./pages/Onboarding/SafetyCheckPage";
 import ExpertConsultPage from "./pages/Onboarding/ExpertConsultPage";
 import OnboardingLayout from "./pages/Onboarding/components/OnboardingLayout";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { setAccessToken, setOnAuthFail } from "./api/http";
-import { logout } from "./api/auth";
+import { logout, refresh } from "./api/auth";
 import LoginPage from "./pages/Auth/LoginPage";
 import SignupPage from "./pages/Auth/SignupPage";
+import ProtectedRoute from "./routes/ProtectedRoute";
+import LoadingOverlay from "./components/LoadingOverlay";
 
 function App() {
   return (
@@ -28,6 +30,25 @@ function App() {
 
 function AppRoutes() {
   const navigate = useNavigate();
+  const [isAuthLoaded, setIsAuthLoaded] = useState(false);
+  const [showBootLoading, setShowBootLoading] = useState(false);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setShowBootLoading(true);
+    }, 300);
+
+    refresh()
+      .then((r) => setAccessToken(r.accessToken))
+      .catch(() => setAccessToken(null))
+      .finally(() => {
+        setIsAuthLoaded(true);
+        window.clearTimeout(t);
+        setShowBootLoading(false);
+      });
+
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     setOnAuthFail(async () => {
@@ -44,11 +65,12 @@ function AppRoutes() {
     return () => setOnAuthFail(null);
   }, [navigate]);
 
+  if (!isAuthLoaded) {
+    return showBootLoading ? <LoadingOverlay /> : null;
+  }
+
   return (
     <Routes>
-      <Route
-        element={<Layout showHeader={false} showBottomNav={false} />}
-      ></Route>
       <Route path="/" element={<SplashPage />} />
       <Route path="/onboarding" element={<OnboardingLayout />}>
         <Route path="safety" element={<SafetyCheckPage />} />
@@ -62,17 +84,19 @@ function AppRoutes() {
         <Route path="signup" element={<SignupPage />} />
       </Route>
 
-      <Route element={<Layout />}>
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/exercises" element={<ExerciseListPage />} />
-        <Route
-          path="/record"
-          element={<div style={{ padding: "20px" }}>기록 페이지</div>}
-        />
-        <Route
-          path="/profile"
-          element={<div style={{ padding: "20px" }}>프로필 페이지</div>}
-        />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<Layout />}>
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/exercises" element={<ExerciseListPage />} />
+          <Route
+            path="/record"
+            element={<div style={{ padding: "20px" }}>기록 페이지</div>}
+          />
+          <Route
+            path="/profile"
+            element={<div style={{ padding: "20px" }}>프로필 페이지</div>}
+          />
+        </Route>
       </Route>
     </Routes>
   );

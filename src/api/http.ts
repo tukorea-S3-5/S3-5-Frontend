@@ -105,6 +105,7 @@ async function requestJson<TResponse>(
     }
 
     // 정상 응답(JSON) 반환
+    console.log(getAccessToken()); // 상태에 액세스토큰 저장되어 있는지 디버깅용
     return (await res.json()) as TResponse;
   } catch (error) {
     console.error("[NETWORK ERROR]", { method, url, error });
