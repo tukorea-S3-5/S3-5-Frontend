@@ -36,6 +36,7 @@ export default function ReportPage() {
 
   const handleSave = () => {
     // TODO: 서버에 운동 기록 저장
+    +  alert('저장 기능은 준비 중입니다.');
   };
 
   const handleComplete = () => {

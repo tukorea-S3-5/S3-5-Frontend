@@ -101,7 +101,10 @@ const ExerciseListPage: React.FC = () => {
       <TabMenu
         tabs={tabs}
         activeTab={selectedTab}
-        onTabChange={(key) => setSelectedTab(key)}
+        onTabChange={(key) => {
+        setSelectedTab(key); //탭 전환 시 선택 초기화
+        setSelectedExercises([]);
+   }}
       />
 
       <ExerciseList>
