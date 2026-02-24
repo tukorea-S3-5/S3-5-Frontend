@@ -10,7 +10,6 @@ export type InputBoxProps = {
   autoComplete?: string;
   disabled?: boolean;
   rightSlot?: React.ReactNode;
-  name?: string;
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   pattern?: string;
   maxLength?: number;

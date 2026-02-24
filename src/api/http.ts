@@ -6,10 +6,11 @@
 // - 에러 발생 시 메시지 가공 + 콘솔 로그 출력
 // --------------------------------------------------
 
-import { refresh } from "./auth";
-
 // API 기본 주소
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+if (!BASE_URL) {
+  throw new Error("[http] VITE_API_BASE_URL 환경 변수가 설정되지 않았습니다.");
+}
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -33,16 +34,16 @@ async function requestJson<TResponse>(
     const token = getAccessToken();
 
     const res = await fetch(url, {
+      ...init,
       method,
       credentials: "include", // 쿠키(refreshToken) 전송
       headers: {
+        ...(init?.headers ?? {}),
         // 토큰이 있을 때만 Authorization 헤더 추가
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(hasBody ? { "Content-Type": "application/json" } : {}),
-        ...(init?.headers ?? {}),
       },
       ...(hasBody ? { body: JSON.stringify(body) } : {}),
-      ...init,
     });
 
     // 401 Unauthorized: accessToken 만료/무효
@@ -105,7 +106,6 @@ async function requestJson<TResponse>(
     }
 
     // 정상 응답(JSON) 반환
-    console.log(getAccessToken()); // 상태에 액세스토큰 저장되어 있는지 디버깅용
     return (await res.json()) as TResponse;
   } catch (error) {
     console.error("[NETWORK ERROR]", { method, url, error });
@@ -196,9 +196,14 @@ let refreshingPromise: Promise<string> | null = null;
 async function getNewAccessToken() {
   if (!refreshingPromise) {
     refreshingPromise = (async () => {
-      const res = await refresh();
-      setAccessToken(res.accessToken);
-      return res.accessToken;
+      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Refresh failed");
+      const data = (await res.json()) as { accessToken: string };
+      setAccessToken(data.accessToken);
+      return data.accessToken;
     })();
   }
 

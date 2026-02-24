@@ -114,7 +114,7 @@ export default function SignupPage() {
             placeholder="YYYY-MM-DD"
             autoComplete="bday"
             inputMode="numeric"
-            pattern="\d*"
+            pattern="[0-9]*"
             maxLength={10}
             enterKeyHint="done"
           />

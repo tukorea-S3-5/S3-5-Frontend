@@ -53,7 +53,7 @@ function AppRoutes() {
     return () => window.clearTimeout(t);
   }, []);
 
-  // 새로고침시 refresh 토큰으로 새로운 access 토큰 발급
+  // 인증 실패(401 후 refresh도 실패) 시 로그아웃 처리 콜백 등록
   useEffect(() => {
     setOnAuthFail(async () => {
       try {
