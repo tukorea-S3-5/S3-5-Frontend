@@ -3,7 +3,7 @@ import { ThemeProvider } from "styled-components";
 import { GlobalStyle } from "./styles/GlobalStyle";
 import { theme } from "./styles/theme";
 import Layout from "./components/Layout";
-import HomePage from "./pages/HomePage";
+import HomePage from "./pages/Home/HomePage";
 import ExerciseListPage from "./pages/ExerciseList/ExerciseListPage";
 import ExercisePage from './pages/Exercise/ExercisePage';
 import SplashPage from "./pages/SplashPage";
