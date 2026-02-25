@@ -9,7 +9,6 @@ import ExercisePage from "./pages/Exercise/ExercisePage";
 import SplashPage from "./pages/SplashPage";
 import SafetyCheckPage from "./pages/Onboarding/SafetyCheckPage";
 import ExpertConsultPage from "./pages/Onboarding/ExpertConsultPage";
-import OnboardingLayout from "./pages/Onboarding/components/OnboardingLayout";
 import { useEffect, useState } from "react";
 import { setAccessToken, setOnAuthFail } from "./api/http";
 import { logout, refresh } from "./api/auth";
@@ -76,18 +75,17 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* 공개 라우트 */}
-      <Route path="/" element={<SplashPage />} />
-      <Route path="onboarding" element={<OnboardingLayout />}>
-        <Route path="safety" element={<SafetyCheckPage />} />
-        <Route path="expert" element={<ExpertConsultPage />} />
-      </Route>
-      <Route
-        path="auth"
-        element={<Layout showHeader={false} showBottomNav={false} />}
-      >
-        <Route path="login" element={<LoginPage />} />
-        <Route path="signup" element={<SignupPage />} />
+      <Route element={<Layout showHeader={false} showBottomNav={false} />}>
+        {/* 공개 라우트 */}
+        <Route path="/" element={<SplashPage />} />
+        <Route path="onboarding">
+          <Route path="safety" element={<SafetyCheckPage />} />
+          <Route path="expert" element={<ExpertConsultPage />} />
+        </Route>
+        <Route path="auth">
+          <Route path="login" element={<LoginPage />} />
+          <Route path="signup" element={<SignupPage />} />
+        </Route>
       </Route>
 
       {/* 앱 내부 라우트 */}
