@@ -8,6 +8,7 @@ interface ButtonProps {
   onClick?: () => void;
   disabled?: boolean;
   icon?: React.ReactNode;
+  type?: "button" | "submit" | "reset";
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -17,9 +18,11 @@ const Button: React.FC<ButtonProps> = ({
   onClick,
   disabled = false,
   icon,
+  type = "button",
 }) => {
   return (
     <StyledButton
+      type={type}
       variant={variant}
       size={size}
       onClick={onClick}
