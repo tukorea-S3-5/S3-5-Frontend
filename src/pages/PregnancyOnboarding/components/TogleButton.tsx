@@ -61,7 +61,7 @@ const ChoiceButton = styled.button<{ $active: boolean }>`
   border-radius: ${({ theme }) => theme.borderRadius.md};
 
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.5s ease;
 
   display: flex;
   flex-direction: column;

@@ -36,7 +36,7 @@ export default function StepFitness({ value, dispatch }: Props) {
 const Wrap = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 15px;
 `;
 
 const Choice = styled.button<{ $active: boolean }>`
@@ -44,8 +44,7 @@ const Choice = styled.button<{ $active: boolean }>`
   padding: 14px 12px;
   border-radius: 12px;
   border: 1px solid
-    ${({ theme, $active }) =>
-      $active ? theme.colors.point : theme.colors.sub};
+    ${({ theme, $active }) => ($active ? theme.colors.point : theme.colors.sub)};
   background: ${({ theme, $active }) =>
     $active ? theme.colors.light : theme.colors.white};
   color: ${({ theme }) => theme.colors.text.primary};

@@ -2,6 +2,7 @@ import styled from "styled-components";
 import type { Dispatch } from "react";
 import { PregnancyCondition } from "@/api/pregnancyInfo";
 import type { PregnancyAction } from "../usePregnancyOnboarding";
+import Checkbox from "@/components/Checkbox";
 
 type Props = {
   values: PregnancyCondition[];
@@ -24,49 +25,51 @@ export default function StepConditions({
 }: Props) {
   return (
     <Wrap>
-      {conditionLabels.map(({ value, label }) => {
-        const active = values.includes(value);
-        return (
-          <Choice
-            key={value}
-            type="button"
-            $active={active}
-            onClick={() => dispatch({ type: "TOGGLE_CONDITION", value })}
-          >
-            {label}
-          </Choice>
-        );
-      })}
+      <ListBox>
+        {conditionLabels.map(({ value, label }) => (
+          <Item key={value}>
+            <Checkbox
+              checked={values.includes(value)}
+              onChange={() => dispatch({ type: "TOGGLE_CONDITION", value })}
+              label={label}
+            />
+          </Item>
+        ))}
 
-      <NoCondition
-        type="button"
-        $active={hasNoConditionSelected}
-        onClick={() => dispatch({ type: "SELECT_NO_CONDITION" })}
-      >
-        해당 사항 없음
-      </NoCondition>
+        <Divider />
+
+        <Item>
+          <Checkbox
+            checked={hasNoConditionSelected}
+            onChange={() => dispatch({ type: "SELECT_NO_CONDITION" })}
+            label="해당 사항 없음"
+          />
+        </Item>
+      </ListBox>
     </Wrap>
   );
 }
 
 const Wrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-`;
-
-const Choice = styled.button<{ $active: boolean }>`
   width: 100%;
-  padding: 14px 12px;
-  border-radius: 12px;
-  border: 1px solid
-    ${({ theme, $active }) =>
-      $active ? theme.colors.point : theme.colors.sub};
-  background: ${({ theme, $active }) =>
-    $active ? theme.colors.light : theme.colors.white};
-  color: ${({ theme }) => theme.colors.text.primary};
-  font-size: 14px;
-  font-weight: 600;
 `;
 
-const NoCondition = styled(Choice)``;
+const ListBox = styled.div`
+  width: 100%;
+  border: 1px solid ${({ theme }) => theme.colors.sub};
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: ${({ theme }) => theme.colors.white};
+`;
+
+const Item = styled.div`
+  padding: 10px 2px;
+`;
+
+const Divider = styled.div`
+  width: 100%;
+  height: 1px;
+  background: ${({ theme }) => theme.colors.middle};
+  opacity: 0.6;
+  margin: 4px 0;
+`;

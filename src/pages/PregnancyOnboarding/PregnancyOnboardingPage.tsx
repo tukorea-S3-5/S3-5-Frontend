@@ -23,6 +23,9 @@ import {
 
 import StepLmp from "./steps/StepLmp";
 import StepMultiple from "./steps/StepMultiple";
+import StepBody from "./steps/StepBody";
+import StepFitness from "./steps/StepFitness";
+import StepConditions from "./steps/StepConditions";
 
 export default function PregnancyOnboardingPage() {
   const navigate = useNavigate();
@@ -170,6 +173,26 @@ export default function PregnancyOnboardingPage() {
 
         {state.step === 1 && (
           <StepMultiple value={state.isMultiple} dispatch={dispatch} />
+        )}
+
+        {state.step === 2 && (
+          <StepBody
+            height={state.height}
+            preWeight={state.preWeight}
+            dispatch={dispatch}
+          />
+        )}
+
+        {state.step === 3 && (
+          <StepFitness value={state.fitnessLevel} dispatch={dispatch} />
+        )}
+
+        {state.step === 4 && (
+          <StepConditions
+            values={state.conditions}
+            hasNoConditionSelected={state.hasNoConditionSelected}
+            dispatch={dispatch}
+          />
         )}
       </OnboardingStepFrame>
 

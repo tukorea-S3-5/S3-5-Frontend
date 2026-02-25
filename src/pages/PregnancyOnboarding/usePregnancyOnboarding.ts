@@ -23,8 +23,8 @@ export const initialState: PregnancyState = {
 export type PregnancyAction =
   | { type: "SET_LMP"; value: string }
   | { type: "SET_IS_MULTIPLE"; value?: boolean }
-  | { type: "SET_HEIGHT"; value: number }
-  | { type: "SET_PRE_WEIGHT"; value: number }
+  | { type: "SET_HEIGHT"; value?: number }
+  | { type: "SET_PRE_WEIGHT"; value?: number }
   | { type: "SET_FITNESS_LEVEL"; value: FitnessLevel }
   | { type: "TOGGLE_CONDITION"; value: PregnancyCondition }
   | { type: "SELECT_NO_CONDITION" }
