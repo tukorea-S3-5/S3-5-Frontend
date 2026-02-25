@@ -23,9 +23,9 @@ export interface PregnancyInfoRequest {
   lastMenstrualPeriod: string; // ISO 날짜 형식
   height: number;
   preWeight: number;
-  isMultiple: boolean;
+  isMultiple?: boolean;
   fitnessLevel: FitnessLevel;
-  conditions: PregnancyCondition[];
+  conditions?: PregnancyCondition[];
 }
 
 /**
@@ -43,6 +43,7 @@ export interface PregnancyInfoResponse {
   bmi: number;
   fitness_level: FitnessLevel;
   max_allowed_bpm: number;
+  conditions: PregnancyCondition[];
   created_at: string;
   updated_at: string;
 }

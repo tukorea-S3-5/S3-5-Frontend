@@ -1,6 +1,6 @@
 import type { Dispatch } from "react";
 import type { PregnancyAction } from "../usePregnancyOnboarding";
-import ToggleButtonGroup from "../components/TogleButton";
+import ToggleButtonGroup from "../components/ToggleButton";
 
 type Props = {
   value?: boolean;

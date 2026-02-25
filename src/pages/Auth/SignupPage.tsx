@@ -106,7 +106,7 @@ export default function SignupPage() {
               value={password}
               onChange={setPassword}
               placeholder="비밀번호"
-              autoComplete="current-password"
+              autoComplete="new-password"
             />
 
             <InputBox

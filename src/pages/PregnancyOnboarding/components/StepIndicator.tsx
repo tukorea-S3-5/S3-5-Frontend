@@ -6,14 +6,32 @@ type Props = {
 };
 
 export default function StepIndicator({ total, current }: Props) {
+  const now = Math.min(total, Math.max(1, current + 1));
+
   return (
     <Wrap aria-label="진행 단계">
+      <SrOnly aria-live="polite">
+        {now} / {total} 단계
+      </SrOnly>
+
       {Array.from({ length: total }).map((_, i) => (
-        <Dot key={i} $active={i === current} />
+        <Dot key={i} $active={i === current} aria-hidden="true" />
       ))}
     </Wrap>
   );
 }
+
+const SrOnly = styled.span`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  border: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+`;
 
 const Wrap = styled.div`
   display: flex;
