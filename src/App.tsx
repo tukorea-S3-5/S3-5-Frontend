@@ -18,6 +18,7 @@ import SignupPage from "./pages/Auth/SignupPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import LoadingOverlay from "./components/LoadingOverlay";
 import ReportPage from "./pages/Exercise/ReportPage";
+import PregnancyOnboardingPage from "./pages/PregnancyOnboarding/PregnancyOnboardingPage";
 
 function App() {
   return (
@@ -77,14 +78,12 @@ function AppRoutes() {
     <Routes>
       {/* 공개 라우트 */}
       <Route path="/" element={<SplashPage />} />
-      <Route path="/onboarding" element={<OnboardingLayout />}>
+      <Route path="onboarding" element={<OnboardingLayout />}>
         <Route path="safety" element={<SafetyCheckPage />} />
         <Route path="expert" element={<ExpertConsultPage />} />
       </Route>
-
-      {/* 인증 라우트(헤더/바텀네비 숨김) */}
       <Route
-        path="/auth"
+        path="auth"
         element={<Layout showHeader={false} showBottomNav={false} />}
       >
         <Route path="login" element={<LoginPage />} />
@@ -93,17 +92,23 @@ function AppRoutes() {
 
       {/* 앱 내부 라우트 */}
       <Route element={<ProtectedRoute />}>
-        <Route element={<Layout />}>
-          <Route path="/home" element={<HomePage />} />
-          <Route path="/exercises" element={<ExerciseListPage />} />
-          <Route path="/exercise" element={<ExercisePage />} />
-          <Route path="/report" element={<ReportPage />} />
+        <Route element={<Layout showHeader={false} showBottomNav={false} />}>
           <Route
-            path="/record"
+            path="pregnancy-onboarding"
+            element={<PregnancyOnboardingPage />}
+          />
+        </Route>
+        <Route element={<Layout />}>
+          <Route path="home" element={<HomePage />} />
+          <Route path="exercises" element={<ExerciseListPage />} />
+          <Route path="exercise" element={<ExercisePage />} />
+          <Route path="report" element={<ReportPage />} />
+          <Route
+            path="record"
             element={<div style={{ padding: "20px" }}>기록 페이지</div>}
           />
           <Route
-            path="/profile"
+            path="profile"
             element={<div style={{ padding: "20px" }}>프로필 페이지</div>}
           />
         </Route>

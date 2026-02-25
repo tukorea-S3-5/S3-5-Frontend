@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
-import { signup } from "../../api/auth";
+import { signup, login } from "../../api/auth";
+import { setAccessToken } from "../../api/http";
 import Button from "../../components/Button";
 import InputBox from "../../components/InputBox";
 
@@ -18,6 +19,9 @@ export default function SignupPage() {
 
   const handleSignup = async () => {
     setErrorMsg(null);
+
+    // 중복 실행 방지
+    if (loading) return;
 
     if (!email || !password || !name || !birth_date) {
       setErrorMsg("필수 항목을 모두 입력해 주세요.");
@@ -35,7 +39,13 @@ export default function SignupPage() {
       setLoading(true);
       await signup({ email, password, name, birth_date });
 
-      navigate("/auth/login", { replace: true });
+      // 회원가입 직후 자동 로그인
+      const tokens = await login({ email, password });
+
+      // accessToken을 메모리에 저장
+      setAccessToken(tokens.accessToken);
+
+      navigate("/pregnancy-onboarding", { replace: true });
     } catch (err: any) {
       console.error("회원가입 실패:", err);
 
@@ -74,6 +84,7 @@ export default function SignupPage() {
         </TabRow>
 
         <Form
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
             handleSignup();
@@ -114,7 +125,6 @@ export default function SignupPage() {
             placeholder="YYYY-MM-DD"
             autoComplete="bday"
             inputMode="numeric"
-            pattern="[0-9]*"
             maxLength={10}
             enterKeyHint="done"
           />

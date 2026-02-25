@@ -63,6 +63,7 @@ const IconWrap = styled.div`
 `;
 
 const Title = styled.h2`
+  padding-top: 8px;
   margin: 0;
   font-size: 18px;
   font-weight: 700;
