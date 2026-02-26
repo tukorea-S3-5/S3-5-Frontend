@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
@@ -10,6 +10,7 @@ import splashLogo from "../../assets/icons/splash_logo.svg";
 
 export default function SignupPage() {
   const navigate = useNavigate();
+  const submittingRef = useRef(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,18 +20,19 @@ export default function SignupPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSignup = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setErrorMsg(null);
-
-    // 중복 실행 방지
-    if (loading) return;
 
     if (!email || !password || !name || !birth_date) {
       setErrorMsg("필수 항목을 모두 입력해 주세요.");
+      submittingRef.current = false;
       return;
     }
 
     if (!isValidBirthDate(birth_date)) {
       setErrorMsg("올바른 날짜로 입력해 주세요. (예: 2003-12-31)");
+      submittingRef.current = false;
       return;
     }
 
@@ -57,6 +59,7 @@ export default function SignupPage() {
       );
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 

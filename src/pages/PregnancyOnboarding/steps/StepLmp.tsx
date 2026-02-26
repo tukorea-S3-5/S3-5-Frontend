@@ -34,7 +34,17 @@ export default function StepLmp({ value, dispatch }: Props) {
         label="마지막 생리 시작일 (LMP)"
         type="date"
         value={value}
-        onChange={(v) => dispatch({ type: "SET_LMP", value: v })}
+        onChange={(v) => {
+          if (!v) {
+            dispatch({ type: "SET_LMP", value: "" });
+            return;
+          }
+          const picked = new Date(`${v}T00:00:00`);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (picked > today) return;
+          dispatch({ type: "SET_LMP", value: v });
+        }}
       />
       <Hint>💡 마지막 생리가 시작된 첫날을 선택해 주세요.</Hint>
       {dueDateText && <Preview>출산 예정일: {dueDateText}</Preview>}

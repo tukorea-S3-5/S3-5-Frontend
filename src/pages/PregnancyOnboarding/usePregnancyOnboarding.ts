@@ -76,7 +76,7 @@ export function pregnancyReducer(
       };
 
     case "NEXT":
-      return { ...state, step: state.step + 1 };
+      return { ...state, step: Math.min(TOTAL_STEPS - 1, state.step + 1) };
 
     case "PREV":
       return { ...state, step: Math.max(0, state.step - 1) };

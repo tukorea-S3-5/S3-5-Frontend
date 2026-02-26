@@ -1,4 +1,4 @@
-import { useMemo, useReducer } from "react";
+import { useMemo, useReducer, useState } from "react";
 import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
 
@@ -30,6 +30,7 @@ import StepConditions from "./steps/StepConditions";
 export default function PregnancyOnboardingPage() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(pregnancyReducer, initialState);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const nextEnabled = useMemo(() => canGoNext(state), [state]);
   const isLast = state.step === TOTAL_STEPS - 1;
@@ -41,7 +42,7 @@ export default function PregnancyOnboardingPage() {
   const handlePrev = () => dispatch({ type: "PREV" });
 
   const handleNext = async () => {
-    if (!nextEnabled) return;
+    if (!nextEnabled || isSubmitting) return;
 
     if (state.step === 1 && state.isMultiple === undefined) {
       dispatch({ type: "NEXT" });
@@ -62,6 +63,7 @@ export default function PregnancyOnboardingPage() {
       }
 
       try {
+        setIsSubmitting(true);
         await registerPregnancyInfo({
           lastMenstrualPeriod: state.lastMenstrualPeriod,
           isMultiple: state.isMultiple ?? false, // 건너뛰면 false 처리
@@ -75,6 +77,8 @@ export default function PregnancyOnboardingPage() {
       } catch (e) {
         console.error(e);
         alert("임신 정보 등록에 실패했어요. 잠시 후 다시 시도해 주세요.");
+      } finally {
+        setIsSubmitting(false);
       }
       return;
     }
@@ -212,7 +216,7 @@ export default function PregnancyOnboardingPage() {
           variant="primary"
           size="long"
           onClick={handleNext}
-          disabled={!nextEnabled}
+          disabled={!nextEnabled || isSubmitting}
           type="button"
         >
           {isLast ? "완료" : isMultipleUnselected ? "건너뛰기" : "다음"}
