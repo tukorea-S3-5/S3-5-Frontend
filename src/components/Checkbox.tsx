@@ -44,17 +44,18 @@ const HiddenInput = styled.input`
 `;
 
 const Box = styled.span<{ $checked: boolean; $disabled: boolean }>`
-  width: 20px;
-  height: 20px;
-  min-width: 18px;
-  min-height: 18px;
+  width: 18px;
+  height: 18px;
   flex: 0 0 18px;
+  box-sizing: border-box;
+
   border-radius: 5px;
   border: 1.5px solid
     ${({ theme, $disabled }) =>
       $disabled ? theme.colors.border : theme.colors.middle};
   background: ${({ $checked, theme }) =>
     $checked ? theme.colors.primary : "transparent"};
+
   display: inline-flex;
   align-items: center;
   justify-content: center;

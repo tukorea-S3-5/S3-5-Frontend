@@ -6,6 +6,7 @@ import { login } from "../../api/auth";
 import { setAccessToken } from "../../api/http";
 import Button from "../../components/Button";
 import InputBox from "../../components/InputBox";
+import splashLogo from "../../assets/icons/splash_logo.svg";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -49,61 +50,64 @@ export default function LoginPage() {
 
   return (
     <Screen>
-      <Card>
-        <TabRow>
-          <TabButtonWrapper>
-            <Button variant="primary" size="long">
-              로그인
-            </Button>
-          </TabButtonWrapper>
+      <ContentWrapper>
+        <LogoIcon src={splashLogo} alt="MOMFIT" />
+        <Card>
+          <TabRow>
+            <TabButtonWrapper>
+              <Button variant="primary" size="long">
+                로그인
+              </Button>
+            </TabButtonWrapper>
 
-          <TabButtonWrapper>
-            <Button
-              variant="outlined"
-              size="long"
-              onClick={() => navigate("/auth/signup")}
-            >
-              회원가입
-            </Button>
-          </TabButtonWrapper>
-        </TabRow>
+            <TabButtonWrapper>
+              <Button
+                variant="outlined"
+                size="long"
+                onClick={() => navigate("/auth/signup")}
+              >
+                회원가입
+              </Button>
+            </TabButtonWrapper>
+          </TabRow>
 
-        <Form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleLogin();
-          }}
-        >
-          <InputBox
-            label="이메일"
-            type="email"
-            value={email}
-            onChange={setEmail}
-            placeholder="test@tukorea.ac.kr"
-            autoComplete="email"
-          />
-
-          <InputBox
-            label="비밀번호"
-            type="password"
-            value={password}
-            onChange={setPassword}
-            placeholder="비밀번호"
-            autoComplete="current-password"
-          />
-
-          {errorMsg && <ErrorText>{errorMsg}</ErrorText>}
-
-          <Button
-            variant="primary"
-            size="long"
-            type="submit"
-            disabled={loading}
+          <Form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin();
+            }}
           >
-            {loading ? "로그인 중..." : "로그인"}
-          </Button>
-        </Form>
-      </Card>
+            <InputBox
+              label="이메일"
+              type="email"
+              value={email}
+              onChange={setEmail}
+              placeholder="test@tukorea.ac.kr"
+              autoComplete="email"
+            />
+
+            <InputBox
+              label="비밀번호"
+              type="password"
+              value={password}
+              onChange={setPassword}
+              placeholder="비밀번호"
+              autoComplete="current-password"
+            />
+
+            {errorMsg && <ErrorText>{errorMsg}</ErrorText>}
+
+            <Button
+              variant="primary"
+              size="long"
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? "로그인 중..." : "로그인"}
+            </Button>
+          </Form>
+        </Card>
+      </ContentWrapper>
     </Screen>
   );
 }
@@ -150,4 +154,19 @@ const Form = styled.form`
 const ErrorText = styled.div`
   ${({ theme }) => theme.typography.label};
   color: ${({ theme }) => theme.colors.point};
+`;
+
+const ContentWrapper = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+
+  margin-top: -50px; /* 살짝 위로 */
+`;
+
+const LogoIcon = styled.img`
+  width: 310px;
+  height: 160px;
 `;

@@ -14,7 +14,6 @@ export interface LoginRequest {
  */
 export interface LoginResponse {
   accessToken: string;
-  refreshToken: string;
 }
 
 /**
@@ -46,7 +45,6 @@ export async function signup(body: SignupRequest) {
  */
 export interface RefreshResponse {
   accessToken: string;
-  refreshToken: string;
 }
 
 /**

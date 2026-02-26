@@ -9,7 +9,6 @@ import ExercisePage from "./pages/Exercise/ExercisePage";
 import SplashPage from "./pages/SplashPage";
 import SafetyCheckPage from "./pages/Onboarding/SafetyCheckPage";
 import ExpertConsultPage from "./pages/Onboarding/ExpertConsultPage";
-import OnboardingLayout from "./pages/Onboarding/components/OnboardingLayout";
 import { useEffect, useState } from "react";
 import { setAccessToken, setOnAuthFail } from "./api/http";
 import { logout, refresh } from "./api/auth";
@@ -18,6 +17,7 @@ import SignupPage from "./pages/Auth/SignupPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import LoadingOverlay from "./components/LoadingOverlay";
 import ReportPage from "./pages/Exercise/ReportPage";
+import PregnancyOnboardingPage from "./pages/PregnancyOnboarding/PregnancyOnboardingPage";
 
 function App() {
   return (
@@ -75,35 +75,38 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* 공개 라우트 */}
-      <Route path="/" element={<SplashPage />} />
-      <Route path="/onboarding" element={<OnboardingLayout />}>
-        <Route path="safety" element={<SafetyCheckPage />} />
-        <Route path="expert" element={<ExpertConsultPage />} />
-      </Route>
-
-      {/* 인증 라우트(헤더/바텀네비 숨김) */}
-      <Route
-        path="/auth"
-        element={<Layout showHeader={false} showBottomNav={false} />}
-      >
-        <Route path="login" element={<LoginPage />} />
-        <Route path="signup" element={<SignupPage />} />
+      <Route element={<Layout showHeader={false} showBottomNav={false} />}>
+        {/* 공개 라우트 */}
+        <Route path="/" element={<SplashPage />} />
+        <Route path="onboarding">
+          <Route path="safety" element={<SafetyCheckPage />} />
+          <Route path="expert" element={<ExpertConsultPage />} />
+        </Route>
+        <Route path="auth">
+          <Route path="login" element={<LoginPage />} />
+          <Route path="signup" element={<SignupPage />} />
+        </Route>
       </Route>
 
       {/* 앱 내부 라우트 */}
       <Route element={<ProtectedRoute />}>
-        <Route element={<Layout />}>
-          <Route path="/home" element={<HomePage />} />
-          <Route path="/exercises" element={<ExerciseListPage />} />
-          <Route path="/exercise" element={<ExercisePage />} />
-          <Route path="/report" element={<ReportPage />} />
+        <Route element={<Layout showHeader={false} showBottomNav={false} />}>
           <Route
-            path="/record"
+            path="pregnancy-onboarding"
+            element={<PregnancyOnboardingPage />}
+          />
+        </Route>
+        <Route element={<Layout />}>
+          <Route path="home" element={<HomePage />} />
+          <Route path="exercises" element={<ExerciseListPage />} />
+          <Route path="exercise" element={<ExercisePage />} />
+          <Route path="report" element={<ReportPage />} />
+          <Route
+            path="record"
             element={<div style={{ padding: "20px" }}>기록 페이지</div>}
           />
           <Route
-            path="/profile"
+            path="profile"
             element={<div style={{ padding: "20px" }}>프로필 페이지</div>}
           />
         </Route>
