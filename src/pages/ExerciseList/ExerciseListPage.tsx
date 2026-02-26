@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, TabMenu } from '../../components';
 import ExerciseCard from './components/ExerciseCard';
 import MOMI_empty from '@assets/icons/images/MOMI_empty.png';
-import { getJson } from '../../api/http';
+import { getJson, postJson } from '../../api/http';
 
 interface ExerciseFromAPI {
   exercise_id: number;
@@ -16,6 +16,20 @@ interface ExerciseFromAPI {
   allowed_trimesters: number[];
   description: string;
   difficulty_label: string;
+}
+
+interface SessionResponse {
+  session: {
+    session_id: number;
+    status: string;
+    started_at: string;
+  };
+  records: {
+    record_id: number;
+    exercise_id: number;
+    exercise_name: string;
+    order_index: number;
+  }[];
 }
 
 interface RecommendResponse {
@@ -39,7 +53,7 @@ const toExercise = (e: ExerciseFromAPI): Exercise => ({
   description: e.description,
   category: e.category_name,
   difficulty: e.difficulty_label,
-  videoUrl: '', // TODO: 영상 URL 연동 시 추가
+  videoUrl: e.video_url ?? '',
 });
 
 const TAB_KEYS = ['추천', '주의', '비추천'] as const;
@@ -80,11 +94,25 @@ const ExerciseListPage = () => {
     );
   };
 
-  const handleStartAll = () => navigate('/exercise', { state: { exercises } });
+  const handleStartAll = async () => {
+    try {
+      const res = await postJson<SessionResponse>('/exercise/session/start');
+      navigate('/exercise', { state: { exercises, session: { ...res.session, records: res.records } } });
+    } catch {
+      navigate('/exercise', { state: { exercises } });
+    }
+  };
 
-  const handleStartSelected = () => {
+  const handleStartSelected = async () => {
     const selected = exercises.filter(e => selectedExercises.includes(e.id));
-    navigate('/exercise', { state: { exercises: selected } });
+    try {
+      const res = await postJson<SessionResponse>('/exercise/record/start', {
+        exercise_ids: selected.map(e => Number(e.id)),
+      });
+      navigate('/exercise', { state: { exercises: selected, session: { ...res.session, records: res.records } } });
+    } catch {
+      navigate('/exercise', { state: { exercises: selected } });
+    }
   };
 
   return (
@@ -121,7 +149,7 @@ const ExerciseListPage = () => {
         ) : exercises.length === 0 ? (
           <EmptyState>
             <EmptyImage src={MOMI_empty} alt="운동 없음" />
-            <EmptyText>조건에 맞는 추천 운동이 없네요ㅜㅜ{'\n'}오늘은 푹 쉬는게 좋겠어요!</EmptyText>
+            <EmptyText>조건에 맞는 추천 운동이 없네요!{'\n'}오늘은 푹 쉬세요 🌸</EmptyText>
           </EmptyState>
         ) : (
           exercises.map(exercise => (

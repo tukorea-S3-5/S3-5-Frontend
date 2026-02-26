@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import Modal from '@components/Modal';
 import DeviceConnection from './components/DeviceConnection';
 import ExerciseListItem from './components/ExerciseListItem';
+import { postJson } from '../../api/http';
 
 declare global {
   interface Window {
@@ -14,7 +15,6 @@ declare global {
     onYouTubeIframeAPIReady: () => void;
   }
 }
-
 interface YTPlayer {
   playVideo(): void;
   pauseVideo(): void;
@@ -28,6 +28,11 @@ interface Exercise {
   videoUrl: string;
 }
 
+interface SessionRecord {
+  record_id: number;
+  exercise_id: number;
+}
+
 type PlayState = 'idle' | 'playing' | 'paused';
 
 const formatTime = (s: number) =>
@@ -39,10 +44,13 @@ const toVideoId = (url: string) =>
 export default function ExercisePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { exercises, currentHeartRate = 0 } = (location.state as {
+  const { exercises, currentHeartRate = 0, session } = (location.state as {
     exercises: Exercise[];
     currentHeartRate?: number;
+    session?: { session_id: number; records: SessionRecord[] };
   }) ?? { exercises: [] };
+
+  //console.log('[ExercisePage] location.state:', location.state);
 
   const [isConnected, setIsConnected] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -50,16 +58,18 @@ export default function ExercisePage() {
   const [duration, setDuration] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [ytReady, setYtReady] = useState(false);
-  const [cdModal, setCdModal] = useState<{ type: 'next' | 'earlyStop' | null; countdown: number }>({ type: null, countdown: 5 });
+  const [stopModal, setStopModal] = useState(false);
   const [switchModal, setSwitchModal] = useState<{ open: boolean; targetIndex: number }>({ open: false, targetIndex: 0 });
 
   const playerRef = useRef<YTPlayer | null>(null);
   const playerElRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cdRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const current = exercises[currentIndex];
   const isLast = currentIndex === exercises.length - 1;
+
+  const getRecordId = (exerciseId: number) =>
+    session?.records?.find(r => r.exercise_id === exerciseId)?.record_id ?? null;
 
   // YouTube IFrame API 로드
   useEffect(() => {
@@ -70,7 +80,7 @@ export default function ExercisePage() {
     window.onYouTubeIframeAPIReady = () => setYtReady(true);
   }, []);
 
-  // 운동 바뀌거나 API 준비되면 플레이어 생성
+  // 운동 바뀌면 플레이어 생성 후 자동 시작
   useEffect(() => {
     if (!ytReady || !playerElRef.current) return;
     playerRef.current?.destroy();
@@ -79,13 +89,19 @@ export default function ExercisePage() {
     setDuration(0);
     playerRef.current = new window.YT.Player(playerElRef.current, {
       videoId: toVideoId(current.videoUrl),
-      playerVars: { controls: 0, rel: 0, modestbranding: 1 },
+      playerVars: { controls: 0, rel: 0, modestbranding: 1, autoplay: 1 },
       events: {
-        onReady: (e: { target: YTPlayer }) => setDuration(e.target.getDuration()),
+        onReady: (e: { target: YTPlayer }) => {
+          setDuration(e.target.getDuration());
+          e.target.playVideo();
+          setPlayState('playing');
+        },
         onStateChange: (e: { data: number }) => {
           if (e.data === window.YT.PlayerState.ENDED) {
             setPlayState('idle');
-            isLast ? finishAll() : startCdModal('next');
+            handleRecordEnd(current.id, () => {
+              isLast ? finishAll() : goNext();
+            });
           }
         },
       },
@@ -102,37 +118,38 @@ export default function ExercisePage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [playState]);
 
-  const startCdModal = (type: 'next' | 'earlyStop') => {
-    if (cdRef.current) clearInterval(cdRef.current);
-    setCdModal({ type, countdown: 5 });
-    let count = 5;
-    cdRef.current = setInterval(() => {
-      count -= 1;
-      if (count <= 0) {
-        clearInterval(cdRef.current!);
-        setCdModal({ type: null, countdown: 5 });
-        type === 'next' ? goNext() : finishAll();
-      } else {
-        setCdModal({ type, countdown: count });
+  const handleRecordEnd = async (exerciseId: number, onDone: () => void) => {
+    const recordId = getRecordId(exerciseId);
+    if (recordId) {
+      try {
+        await postJson('/exercise/record/end', { record_id: recordId });
+      } catch {
+        // 실패해도 진행
       }
-    }, 1000);
+    }
+    onDone();
   };
 
-  const cancelCdModal = () => {
-    if (cdRef.current) clearInterval(cdRef.current);
-    setCdModal({ type: null, countdown: 5 });
-  };
-
-  const goNext = () => { cancelCdModal(); setCurrentIndex(p => p + 1); };
-  const finishAll = () => { cancelCdModal(); navigate('/report', { state: { exercises } }); };
+  const goNext = () => setCurrentIndex(p => p + 1);
+  const finishAll = () => navigate('/report', { state: { exercises } });
 
   const handleStart = () => { playerRef.current?.playVideo(); setPlayState('playing'); };
   const handlePause = () => { playerRef.current?.pauseVideo(); setPlayState('paused'); };
   const handleResume = () => { playerRef.current?.playVideo(); setPlayState('playing'); };
-  const handleStop = () => { playerRef.current?.pauseVideo(); setPlayState('paused'); startCdModal('earlyStop'); };
+
+  // 각 운동의 종료 버튼 (다음 운동으로)
+  const handleCurrentEnd = () => {
+    playerRef.current?.pauseVideo();
+    handleRecordEnd(current.id, () => {
+      isLast ? finishAll() : goNext();
+    });
+  };
+
+  // 우상단 전체 운동 종료
+  const handleStopAll = () => setStopModal(true);
+  const handleStopConfirm = () => { setStopModal(false); finishAll(); };
 
   const handleSwitchConfirm = () => {
-    cancelCdModal();
     const target = switchModal.targetIndex;
     setSwitchModal({ open: false, targetIndex: 0 });
     setCurrentIndex(target);
@@ -150,7 +167,10 @@ export default function ExercisePage() {
 
       {isConnected && (
         <Container>
-          <PageTitle>영상을 보고 따라해보세요!</PageTitle>
+          <Header>
+            <PageTitle>영상을 보고 따라해보세요!</PageTitle>
+            <StopAllButton onClick={handleStopAll}>운동 종료</StopAllButton>
+          </Header>
 
           <VideoBox>
             <div ref={playerElRef} style={{ width: '100%', height: '100%' }} />
@@ -176,11 +196,15 @@ export default function ExercisePage() {
             {playState === 'idle' && <ActionButton onClick={handleStart}>▷ 시작하기</ActionButton>}
             {playState === 'playing' && <>
               <ActionButton $variant="outline" onClick={handlePause}>일시정지</ActionButton>
-              <ActionButton $variant="danger" onClick={handleStop}>종료</ActionButton>
+              <ActionButton $variant="danger" onClick={handleCurrentEnd}>
+                {isLast ? '운동 완료' : '다음 운동'}
+              </ActionButton>
             </>}
             {playState === 'paused' && <>
               <ActionButton onClick={handleResume}>▷ 재개하기</ActionButton>
-              <ActionButton $variant="danger" onClick={handleStop}>종료</ActionButton>
+              <ActionButton $variant="danger" onClick={handleCurrentEnd}>
+                {isLast ? '운동 완료' : '다음 운동'}
+              </ActionButton>
             </>}
           </ControlRow>
 
@@ -197,30 +221,16 @@ export default function ExercisePage() {
             ))}
           </ListSection>
 
-          {/* 다음 운동 / 중도 종료 모달 */}
-          <Modal isOpen={cdModal.type !== null} onClose={cancelCdModal} showCloseButton={false}>
+          {/* 전체 운동 종료 모달 */}
+          <Modal isOpen={stopModal} onClose={() => setStopModal(false)} showCloseButton={false}>
             <ModalBody>
-              {cdModal.type === 'next' ? (
-                <>
-                  <ModalEmoji>🎉</ModalEmoji>
-                  <ModalTitle>운동이 끝났습니다!</ModalTitle>
-                  <ModalDesc>{cdModal.countdown}초 후 <strong>{exercises[currentIndex + 1]?.title}</strong>으로 넘어갑니다</ModalDesc>
-                  <ModalButtons>
-                    <ModalOutlineBtn onClick={cancelCdModal}>잠깐 쉴게요</ModalOutlineBtn>
-                    <ModalFillBtn onClick={goNext}>바로 넘어가기</ModalFillBtn>
-                  </ModalButtons>
-                </>
-              ) : (
-                <>
-                  <ModalEmoji>⚠️</ModalEmoji>
-                  <ModalTitle>운동이 아직 남았어요!</ModalTitle>
-                  <ModalDesc>{cdModal.countdown}초 후 자동으로 종료됩니다</ModalDesc>
-                  <ModalButtons>
-                    <ModalOutlineBtn onClick={cancelCdModal}>계속할게요</ModalOutlineBtn>
-                    <ModalFillBtn onClick={finishAll}>종료하기</ModalFillBtn>
-                  </ModalButtons>
-                </>
-              )}
+              <ModalEmoji>⚠️</ModalEmoji>
+              <ModalTitle>운동을 종료할까요?</ModalTitle>
+              <ModalDesc>운동이 아직 남아있어요.{'\n'}지금 종료하면 리포트로 이동합니다.</ModalDesc>
+              <ModalButtons>
+                <ModalOutlineBtn onClick={() => setStopModal(false)}>계속할게요</ModalOutlineBtn>
+                <ModalFillBtn onClick={handleStopConfirm}>종료하기</ModalFillBtn>
+              </ModalButtons>
             </ModalBody>
           </Modal>
 
@@ -248,10 +258,27 @@ const Container = styled.div`
   overflow-y: auto;
   padding: 24px 16px 120px;
 `;
+const Header = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+`;
 const PageTitle = styled.h1`
   ${({ theme }) => theme.typography.heading2}
   color: ${({ theme }) => theme.colors.text.primary};
-  margin: 0 0 20px 0;
+  margin: 0;
+`;
+const StopAllButton = styled.button`
+  ${({ theme }) => theme.typography.caption}
+  color: ${({ theme }) => theme.colors.subtext};
+  background: transparent;
+  border: 1px solid ${({ theme }) => theme.colors.sub};
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  padding: 6px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  &:hover { border-color: ${({ theme }) => theme.colors.point}; color: ${({ theme }) => theme.colors.point}; }
 `;
 const VideoBox = styled.div`
   width: 100%;
@@ -352,6 +379,7 @@ const ModalDesc = styled.p`
   ${({ theme }) => theme.typography.body2}
   color: ${({ theme }) => theme.colors.subtext};
   margin: 0;
+  white-space: pre-line;
 `;
 const ModalButtons = styled.div`
   display: flex;
