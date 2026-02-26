@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
-import { signup } from "../../api/auth";
+import { signup, login } from "../../api/auth";
+import { setAccessToken } from "../../api/http";
 import Button from "../../components/Button";
 import InputBox from "../../components/InputBox";
+import splashLogo from "../../assets/icons/splash_logo.svg";
 
 export default function SignupPage() {
   const navigate = useNavigate();
+  const submittingRef = useRef(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,17 +20,19 @@ export default function SignupPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSignup = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setErrorMsg(null);
 
     if (!email || !password || !name || !birth_date) {
       setErrorMsg("필수 항목을 모두 입력해 주세요.");
+      submittingRef.current = false;
       return;
     }
 
     if (!isValidBirthDate(birth_date)) {
-      setErrorMsg(
-        "생년월일을 YYYY-MM-DD 형식으로 입력해 주세요. 예: 2003-01-02",
-      );
+      setErrorMsg("올바른 날짜로 입력해 주세요. (예: 2003-12-31)");
+      submittingRef.current = false;
       return;
     }
 
@@ -35,7 +40,13 @@ export default function SignupPage() {
       setLoading(true);
       await signup({ email, password, name, birth_date });
 
-      navigate("/auth/login", { replace: true });
+      // 회원가입 직후 자동 로그인
+      const tokens = await login({ email, password });
+
+      // accessToken을 메모리에 저장
+      setAccessToken(tokens.accessToken);
+
+      navigate("/pregnancy-onboarding", { replace: true });
     } catch (err: any) {
       console.error("회원가입 실패:", err);
 
@@ -48,89 +59,93 @@ export default function SignupPage() {
       );
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
   return (
     <Screen>
-      <Card>
-        {/* 탭 버튼 (항상 같은 크기) */}
-        <TabRow>
-          <TabButtonWrapper>
-            <Button
-              variant="outlined"
-              size="long"
-              onClick={() => navigate("/auth/login")}
-            >
-              로그인
-            </Button>
-          </TabButtonWrapper>
+      <ContentWrapper>
+        <LogoIcon src={splashLogo} alt="MOMFIT" />
+        <Card>
+          {/* 탭 버튼 (항상 같은 크기) */}
+          <TabRow>
+            <TabButtonWrapper>
+              <Button
+                variant="outlined"
+                size="long"
+                onClick={() => navigate("/auth/login")}
+              >
+                로그인
+              </Button>
+            </TabButtonWrapper>
 
-          <TabButtonWrapper>
-            <Button variant="primary" size="long">
-              회원가입
-            </Button>
-          </TabButtonWrapper>
-        </TabRow>
+            <TabButtonWrapper>
+              <Button variant="primary" size="long">
+                회원가입
+              </Button>
+            </TabButtonWrapper>
+          </TabRow>
 
-        <Form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSignup();
-          }}
-        >
-          <InputBox
-            label="이메일"
-            type="email"
-            value={email}
-            onChange={setEmail}
-            placeholder="test@tukorea.ac.kr"
-            autoComplete="email"
-          />
-
-          <InputBox
-            label="비밀번호"
-            type="password"
-            value={password}
-            onChange={setPassword}
-            placeholder="비밀번호"
-            autoComplete="current-password"
-          />
-
-          <InputBox
-            label="이름"
-            type="text"
-            value={name}
-            onChange={setName}
-            placeholder="이름을 입력해 주세요"
-            autoComplete="name"
-          />
-
-          <InputBox
-            label="생년월일"
-            type="text"
-            value={birth_date}
-            onChange={(v) => setBirthDate(formatBirth(v))}
-            placeholder="YYYY-MM-DD"
-            autoComplete="bday"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={10}
-            enterKeyHint="done"
-          />
-
-          {errorMsg && <ErrorText>{errorMsg}</ErrorText>}
-
-          <Button
-            variant="primary"
-            size="long"
-            type="submit"
-            disabled={loading}
+          <Form
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSignup();
+            }}
           >
-            {loading ? "회원가입 중..." : "회원가입"}
-          </Button>
-        </Form>
-      </Card>
+            <InputBox
+              label="이메일"
+              type="email"
+              value={email}
+              onChange={setEmail}
+              placeholder="test@tukorea.ac.kr"
+              autoComplete="email"
+            />
+
+            <InputBox
+              label="비밀번호"
+              type="password"
+              value={password}
+              onChange={setPassword}
+              placeholder="비밀번호"
+              autoComplete="new-password"
+            />
+
+            <InputBox
+              label="이름"
+              type="text"
+              value={name}
+              onChange={setName}
+              placeholder="이름을 입력해 주세요"
+              autoComplete="name"
+            />
+
+            <InputBox
+              label="생년월일"
+              type="text"
+              value={birth_date}
+              onChange={(v) => setBirthDate(formatBirth(v))}
+              placeholder="YYYY-MM-DD"
+              autoComplete="bday"
+              inputMode="numeric"
+              maxLength={10}
+              enterKeyHint="done"
+            />
+
+            {errorMsg && <ErrorText>{errorMsg}</ErrorText>}
+
+            <Button
+              variant="primary"
+              size="long"
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? "회원가입 중..." : "회원가입"}
+            </Button>
+          </Form>
+        </Card>
+      </ContentWrapper>
     </Screen>
   );
 }
@@ -152,13 +167,26 @@ function isValidBirthDate(value: string) {
   // YYYY-MM-DD 형태인지
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
 
-  // 실제 날짜인지(예: 2003-13-40 방지)
   const [y, m, d] = value.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
 
-  return (
-    dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d
-  );
+  if (y < 1900) return false;
+
+  // 실제 날짜인지(예: 2003-13-40 방지)
+  const dt = new Date(y, m - 1, d);
+  const isRealDate =
+    dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+  if (!isRealDate) return false;
+
+  // 미래 날짜 방지(오늘 이후면 실패)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const inputDate = new Date(y, m - 1, d);
+  inputDate.setHours(0, 0, 0, 0);
+
+  if (inputDate > today) return false;
+
+  return true;
 }
 
 const Screen = styled.div`
@@ -203,4 +231,17 @@ const Form = styled.form`
 const ErrorText = styled.div`
   ${({ theme }) => theme.typography.label};
   color: ${({ theme }) => theme.colors.point};
+`;
+
+const ContentWrapper = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+`;
+
+const LogoIcon = styled.img`
+  width: 310px;
+  height: 160px;
 `;
