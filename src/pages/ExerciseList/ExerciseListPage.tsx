@@ -68,7 +68,7 @@ const ExerciseListPage = () => {
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    getJson<RecommendResponse>('/recommend')
+    getJson<RecommendResponse>(`/recommend?t=${Date.now()}`)
       .then(json => setData(json))
       .catch(() => setError(true))
       .finally(() => setLoading(false));

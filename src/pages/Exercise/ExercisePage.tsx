@@ -50,8 +50,6 @@ export default function ExercisePage() {
     session?: { session_id: number; records: SessionRecord[] };
   }) ?? { exercises: [] };
 
-  //console.log('[ExercisePage] location.state:', location.state);
-
   const [isConnected, setIsConnected] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playState, setPlayState] = useState<PlayState>('idle');
@@ -68,8 +66,8 @@ export default function ExercisePage() {
   const current = exercises[currentIndex];
   const isLast = currentIndex === exercises.length - 1;
 
-  const getRecordId = (exerciseId: number) =>
-    session?.records?.find(r => r.exercise_id === exerciseId)?.record_id ?? null;
+  const getRecordId = (exerciseId: number | string) =>
+    session?.records?.find(r => r.exercise_id === Number(exerciseId))?.record_id ?? null;
 
   // YouTube IFrame API 로드
   useEffect(() => {
@@ -118,26 +116,64 @@ export default function ExercisePage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [playState]);
 
+  const getActiveRecordId = () => getRecordId(current.id);
+
+  // record/end → 다음 운동 또는 완료
   const handleRecordEnd = async (exerciseId: number, onDone: () => void) => {
     const recordId = getRecordId(exerciseId);
     if (recordId) {
-      try {
-        await postJson('/exercise/record/end', { record_id: recordId });
-      } catch {
-        // 실패해도 진행
-      }
+      try { await postJson('/exercise/record/end', { record_id: recordId }); } catch { }
     }
     onDone();
   };
 
+  // record/pause
+  const handleRecordPause = async () => {
+    const recordId = getActiveRecordId();
+    if (recordId) {
+      try { await postJson('/exercise/record/pause', { record_id: recordId }); } catch { }
+    }
+  };
+
+  // record/resume
+  const handleRecordResume = async () => {
+    const recordId = getActiveRecordId();
+    if (recordId) {
+      try { await postJson('/exercise/record/resume', { record_id: recordId }); } catch { }
+    }
+  };
+
+  // session/abort
+  const handleSessionAbort = async () => {
+    if (session?.session_id) {
+      try { await postJson('/exercise/session/abort', { session_id: session.session_id }); } catch { }
+    }
+  };
+
   const goNext = () => setCurrentIndex(p => p + 1);
-  const finishAll = () => navigate('/report', { state: { exercises } });
 
-  const handleStart = () => { playerRef.current?.playVideo(); setPlayState('playing'); };
-  const handlePause = () => { playerRef.current?.pauseVideo(); setPlayState('paused'); };
-  const handleResume = () => { playerRef.current?.playVideo(); setPlayState('playing'); };
+  const finishAll = () => navigate('/report', { state: { exercises, sessionId: session?.session_id } });
 
-  // 각 운동의 종료 버튼 (다음 운동으로)
+  const handleStart = () => {
+    playerRef.current?.playVideo();
+    setPlayState('playing');
+  };
+
+  const handlePause = async () => {
+    playerRef.current?.pauseVideo();
+    setPlayState('paused');
+    console.log('[pause] session:', session);
+    console.log('[pause] current.id:', current.id, typeof current.id);
+    console.log('[pause] recordId:', getRecordId(current.id));
+    await handleRecordPause();
+  };
+
+  const handleResume = async () => {
+    playerRef.current?.playVideo();
+    setPlayState('playing');
+    await handleRecordResume();
+  };
+
   const handleCurrentEnd = () => {
     playerRef.current?.pauseVideo();
     handleRecordEnd(current.id, () => {
@@ -145,13 +181,19 @@ export default function ExercisePage() {
     });
   };
 
-  // 우상단 전체 운동 종료
+  // 우상단 운동 종료 → abort 후 리포트
   const handleStopAll = () => setStopModal(true);
-  const handleStopConfirm = () => { setStopModal(false); finishAll(); };
+  const handleStopConfirm = async () => {
+    setStopModal(false);
+    await handleSessionAbort();
+    finishAll();
+  };
 
-  const handleSwitchConfirm = () => {
+  const handleSwitchConfirm = async () => {
     const target = switchModal.targetIndex;
     setSwitchModal({ open: false, targetIndex: 0 });
+    // 현재 운동 pause 처리 후 전환
+    await handleRecordPause();
     setCurrentIndex(target);
   };
 
@@ -193,19 +235,25 @@ export default function ExercisePage() {
           </ExerciseInfo>
 
           <ControlRow>
-            {playState === 'idle' && <ActionButton onClick={handleStart}>▷ 시작하기</ActionButton>}
-            {playState === 'playing' && <>
-              <ActionButton $variant="outline" onClick={handlePause}>일시정지</ActionButton>
-              <ActionButton $variant="danger" onClick={handleCurrentEnd}>
-                {isLast ? '운동 완료' : '다음 운동'}
-              </ActionButton>
-            </>}
-            {playState === 'paused' && <>
-              <ActionButton onClick={handleResume}>▷ 재개하기</ActionButton>
-              <ActionButton $variant="danger" onClick={handleCurrentEnd}>
-                {isLast ? '운동 완료' : '다음 운동'}
-              </ActionButton>
-            </>}
+            {playState === 'idle' && (
+              <ActionButton onClick={handleStart}>▷ 시작하기</ActionButton>
+            )}
+            {playState === 'playing' && (
+              <>
+                <ActionButton $variant="outline" onClick={handlePause}>일시정지</ActionButton>
+                <ActionButton $variant="danger" onClick={handleCurrentEnd}>
+                  {isLast ? '운동 완료' : '다음 운동'}
+                </ActionButton>
+              </>
+            )}
+            {playState === 'paused' && (
+              <>
+                <ActionButton onClick={handleResume}>▷ 재개하기</ActionButton>
+                <ActionButton $variant="danger" onClick={handleCurrentEnd}>
+                  {isLast ? '운동 완료' : '다음 운동'}
+                </ActionButton>
+              </>
+            )}
           </ControlRow>
 
           <ListSection>
