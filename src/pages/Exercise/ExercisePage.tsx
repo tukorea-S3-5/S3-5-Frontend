@@ -162,9 +162,6 @@ export default function ExercisePage() {
   const handlePause = async () => {
     playerRef.current?.pauseVideo();
     setPlayState('paused');
-    console.log('[pause] session:', session);
-    console.log('[pause] current.id:', current.id, typeof current.id);
-    console.log('[pause] recordId:', getRecordId(current.id));
     await handleRecordPause();
   };
 
