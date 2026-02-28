@@ -5,8 +5,8 @@ interface ExerciseCardProps {
   id: string;
   title: string;
   description: string;
-  category: '유산소' | '요가' | '필라테스' | '근력 운동' | '기능성/이완';
-  difficulty?: '초급' | '중급' | '고급';
+  category: string;
+  difficulty?: string;
   selected?: boolean;
   onClick?: () => void;
 }
@@ -52,7 +52,6 @@ const CardContainer = styled.div<{ $selected: boolean }>`
     $selected ? theme.colors.point : 'transparent'};
 
   &:hover {
-    transform:;
     box-shadow: ${({ theme }) => theme.shadows.md};
   }
 `;
@@ -80,8 +79,8 @@ const CategoryIcon = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  background: ${({ theme }) => theme.colors.light};  /* light 테마색 */
-  color: ${({ theme }) => theme.colors.point};        /* point 테마색 */
+  background: ${({ theme }) => theme.colors.light};
+  color: ${({ theme }) => theme.colors.point};
   border-radius: ${({ theme }) => theme.borderRadius.md};
   font-size: ${({ theme }) => theme.fontSize.xs};
   font-weight: ${({ theme }) => theme.fontWeight.bold};
@@ -109,7 +108,7 @@ const CardDescription = styled.p`
   margin: 0;
 `;
 
-const DifficultyChip = styled.span<{ $level: '초급' | '중급' | '고급' }>`
+const DifficultyChip = styled.span<{ $level: string }>`
   ${({ theme }) => theme.typography.caption}
   display: inline-flex;
   align-items: center;
@@ -127,6 +126,8 @@ const DifficultyChip = styled.span<{ $level: '초급' | '중급' | '고급' }>`
         return `background: #FFF4E5; color: ${theme.colors.warning};`;
       case '고급':
         return `background: #E8F5E9; color: ${theme.colors.success};`;
+      default:
+        return `background: ${theme.colors.light}; color: ${theme.colors.subtext};`;
     }
   }}
 `;
