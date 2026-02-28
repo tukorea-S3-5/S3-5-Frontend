@@ -16,6 +16,7 @@ interface ExerciseFromAPI {
   allowed_trimesters: number[];
   description: string;
   difficulty_label: string;
+  video_url?: string;
 }
 
 interface SessionResponse {
