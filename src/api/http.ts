@@ -83,7 +83,9 @@ async function requestJson<TResponse>(
 
       try {
         const data = await res.json();
-        msg = data?.message ?? msg;
+        const raw = data?.message;
+
+        msg = Array.isArray(raw) ? raw[0] : (raw ?? msg);
       } catch (parseError) {
         console.error("[HTTP] 응답 파싱 실패:", parseError);
       }
@@ -107,7 +109,11 @@ async function requestJson<TResponse>(
 
     // 정상 응답(JSON) 반환
     return (await res.json()) as TResponse;
-  } catch (error) {
+  } catch (error: unknown) {
+    if (typeof error === "object" && error !== null && "status" in error) {
+      throw error;
+    }
+
     console.error("[NETWORK ERROR]", { method, url, error });
     throw error;
   }
