@@ -37,7 +37,7 @@ const DEFAULT_SYMPTOMS: Symptom[] = [
   {
     id: "8",
     emoji: "😮‍💨",
-    label: "곤란",
+    label: "호흡곤란",
     code: "SHORTNESS_OF_BREATH",
     checked: false,
   },
