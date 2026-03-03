@@ -50,12 +50,12 @@ export default function SignupPage() {
     } catch (err: any) {
       console.error("회원가입 실패:", err);
 
-      const isUnauthorized = err?.status === 400;
-
       setErrorMsg(
-        isUnauthorized
+        err?.status === 409
           ? "이미 존재하는 이메일입니다."
-          : "회원가입 중 오류가 발생했습니다. 다시 시도해 주세요.",
+          : err?.status === 400
+            ? err?.message
+            : "회원가입 중 오류가 발생했습니다. 다시 시도해 주세요.",
       );
     } finally {
       setLoading(false);

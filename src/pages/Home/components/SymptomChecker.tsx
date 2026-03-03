@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import styled from 'styled-components';
+import { useState } from "react";
+import styled from "styled-components";
 
 interface Symptom {
   id: string;
@@ -15,36 +15,67 @@ interface SymptomCheckerProps {
 }
 
 const DEFAULT_SYMPTOMS: Symptom[] = [
-  { id: '1', emoji: '🔙', label: '요통', code: 'BACK_PAIN', checked: false },
-  { id: '2', emoji: '😫', label: '피로감', code: 'FATIGUE', checked: false },
-  { id: '3', emoji: '🤢', label: '메스꺼움', code: 'NAUSEA', checked: false },
-  { id: '4', emoji: '😵', label: '어지러움', code: 'DIZZINESS', checked: false },
-  { id: '5', emoji: '🦵', label: '부종', code: 'SWELLING', checked: false },
-  { id: '6', emoji: '🚽', label: '변비', code: 'CONSTIPATION', checked: false },
-  { id: '7', emoji: '💢', label: '골반통', code: 'PELVIC_PAIN', checked: false },
-  { id: '8', emoji: '😮‍💨', label: '호흡곤란', code: 'SHORTNESS_OF_BREATH', checked: false },
+  { id: "1", emoji: "🔙", label: "요통", code: "BACK_PAIN", checked: false },
+  { id: "2", emoji: "😫", label: "피로감", code: "FATIGUE", checked: false },
+  { id: "3", emoji: "🤢", label: "메스꺼움", code: "NAUSEA", checked: false },
+  {
+    id: "4",
+    emoji: "😵",
+    label: "어지러움",
+    code: "DIZZINESS",
+    checked: false,
+  },
+  { id: "5", emoji: "🦵", label: "부종", code: "SWELLING", checked: false },
+  { id: "6", emoji: "🚽", label: "변비", code: "CONSTIPATION", checked: false },
+  {
+    id: "7",
+    emoji: "💢",
+    label: "골반통",
+    code: "PELVIC_PAIN",
+    checked: false,
+  },
+  {
+    id: "8",
+    emoji: "😮‍💨",
+    label: "호흡곤란",
+    code: "SHORTNESS_OF_BREATH",
+    checked: false,
+  },
 ];
 
-export default function SymptomChecker({ onSubmit, onNoSymptom }: SymptomCheckerProps) {
+export default function SymptomChecker({
+  onSubmit,
+  onNoSymptom,
+}: SymptomCheckerProps) {
   const [symptoms, setSymptoms] = useState<Symptom[]>(DEFAULT_SYMPTOMS);
 
-  const hasSelected = symptoms.some(s => s.checked);
+  const hasSelected = symptoms.some((s) => s.checked);
 
   const toggle = (id: string) =>
-    setSymptoms(prev => prev.map(s => s.id === id ? { ...s, checked: !s.checked } : s));
+    setSymptoms((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, checked: !s.checked } : s)),
+    );
 
   return (
     <Card>
       <CardTitle>오늘의 증상을 선택하세요</CardTitle>
 
       <Grid>
-        {symptoms.map(symptom => (
-          <SymptomButton key={symptom.id} $checked={symptom.checked} onClick={() => toggle(symptom.id)}>
+        {symptoms.map((symptom) => (
+          <SymptomButton
+            key={symptom.id}
+            $checked={symptom.checked}
+            onClick={() => toggle(symptom.id)}
+          >
             <Emoji>{symptom.emoji}</Emoji>
             <Label>{symptom.label}</Label>
             <Checkbox $checked={symptom.checked}>
               {symptom.checked && (
-                <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: '100%', height: '100%', color: 'white' }}>
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  style={{ width: "100%", height: "100%", color: "white" }}
+                >
                   <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
                 </svg>
               )}
@@ -55,10 +86,12 @@ export default function SymptomChecker({ onSubmit, onNoSymptom }: SymptomChecker
 
       <SubmitButton
         $active={hasSelected}
-        onClick={() => hasSelected && onSubmit?.(symptoms.filter(s => s.checked))}
+        onClick={() =>
+          hasSelected && onSubmit?.(symptoms.filter((s) => s.checked))
+        }
         disabled={!hasSelected}
       >
-        {hasSelected ? '증상 기록하기' : '증상을 선택해주세요'}
+        {hasSelected ? "증상 기록하기" : "증상을 선택해주세요"}
       </SubmitButton>
 
       <NoSymptomButton onClick={onNoSymptom}>
@@ -87,7 +120,9 @@ const Grid = styled.div`
 `;
 const SymptomButton = styled.button<{ $checked: boolean }>`
   background: ${({ theme }) => theme.colors.white};
-  border: 2px solid ${({ theme, $checked }) => $checked ? theme.colors.point : theme.colors.sub};
+  border: 2px solid
+    ${({ theme, $checked }) =>
+      $checked ? theme.colors.point : theme.colors.sub};
   border-radius: ${({ theme }) => theme.borderRadius.md};
   padding: ${({ theme }) => theme.spacing.sm};
   display: flex;
@@ -95,9 +130,13 @@ const SymptomButton = styled.button<{ $checked: boolean }>`
   gap: ${({ theme }) => theme.spacing.sm};
   cursor: pointer;
   transition: all 0.15s;
-  &:hover { background: ${({ theme }) => theme.colors.light}; }
+  &:hover {
+    background: ${({ theme }) => theme.colors.light};
+  }
 `;
-const Emoji = styled.span`font-size: 20px;`;
+const Emoji = styled.span`
+  font-size: 20px;
+`;
 const Label = styled.span`
   flex: 1;
   ${({ theme }) => theme.typography.caption}
@@ -108,8 +147,11 @@ const Checkbox = styled.div<{ $checked: boolean }>`
   width: 20px;
   height: 20px;
   border-radius: 4px;
-  border: 2px solid ${({ theme, $checked }) => $checked ? theme.colors.point : theme.colors.sub};
-  background: ${({ theme, $checked }) => $checked ? theme.colors.point : theme.colors.white};
+  border: 2px solid
+    ${({ theme, $checked }) =>
+      $checked ? theme.colors.point : theme.colors.sub};
+  background: ${({ theme, $checked }) =>
+    $checked ? theme.colors.point : theme.colors.white};
   flex-shrink: 0;
 `;
 const SubmitButton = styled.button<{ $active: boolean }>`
@@ -117,10 +159,12 @@ const SubmitButton = styled.button<{ $active: boolean }>`
   height: 48px;
   border-radius: ${({ theme }) => theme.borderRadius.md};
   border: none;
-  background: ${({ theme, $active }) => $active ? theme.colors.point : theme.colors.sub};
-  color: ${({ theme, $active }) => $active ? theme.colors.white : theme.colors.subtext};
+  background: ${({ theme, $active }) =>
+    $active ? theme.colors.point : theme.colors.sub};
+  color: ${({ theme, $active }) =>
+    $active ? theme.colors.white : theme.colors.subtext};
   ${({ theme }) => theme.typography.button}
-  cursor: ${({ $active }) => $active ? 'pointer' : 'not-allowed'};
+  cursor: ${({ $active }) => ($active ? "pointer" : "not-allowed")};
   transition: background 0.15s;
   margin-bottom: ${({ theme }) => theme.spacing.sm};
 `;
