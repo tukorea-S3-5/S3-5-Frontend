@@ -4,8 +4,8 @@ import { GlobalStyle } from "./styles/GlobalStyle";
 import { theme } from "./styles/theme";
 import Layout from "./components/Layout";
 import HomePage from "./pages/Home/HomePage";
-import ExerciseListPage from "./pages/ExerciseList/ExerciseListPage";
 import ExercisePage from "./pages/Exercise/ExercisePage";
+import WeightPage from "./pages/Weight/WeightPage";
 import SplashPage from "./pages/SplashPage";
 import SafetyCheckPage from "./pages/Onboarding/SafetyCheckPage";
 import ExpertConsultPage from "./pages/Onboarding/ExpertConsultPage";
@@ -98,7 +98,7 @@ function AppRoutes() {
         </Route>
         <Route element={<Layout />}>
           <Route path="home" element={<HomePage />} />
-          <Route path="exercises" element={<ExerciseListPage />} />
+          <Route path="weight" element={<WeightPage />} />
           <Route path="exercise" element={<ExercisePage />} />
           <Route path="report" element={<ReportPage />} />
           <Route

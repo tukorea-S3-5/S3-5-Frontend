@@ -15,6 +15,7 @@ interface BottomNavProps {
 const defaultItems: NavItemType[] = [
   { path: "/home", label: "홈", icon: "🏠" },
   { path: "/exercises", label: "운동", icon: "💪" },
+  { path: "/weight", label: "체중", icon: "⚖️" },
   { path: "/postnatal", label: "산후", icon: "😊" },
 ];
 
@@ -31,7 +32,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ items = defaultItems }) => {
           onClick={() => navigate(item.path)}
         >
           <NavIcon>{item.icon}</NavIcon>
-          <NavLabel>{item.label}</NavLabel>
+          <NavLabel $active={location.pathname === item.path}>{item.label}</NavLabel>
         </NavItem>
       ))}
     </Nav>
@@ -61,22 +62,20 @@ const NavItem = styled.button<{ $active: boolean }>`
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  opacity: ${(props) => (props.$active ? 1 : 0.5)};
+  opacity: ${({ $active }) => ($active ? 1 : 0.5)};
   transition: opacity 0.2s;
   padding: 4px 12px;
-
-  &:hover {
-    opacity: 1;
-  }
+  &:hover { opacity: 1; }
 `;
 
 const NavIcon = styled.div`
   font-size: 24px;
 `;
 
-const NavLabel = styled.span`
+const NavLabel = styled.span<{ $active: boolean }>`
   font-size: 12px;
-  color: #666;
+  color: ${({ $active }) => ($active ? '#ff5038' : '#666')};
+  font-weight: ${({ $active }) => ($active ? '600' : 'normal')};
 `;
 
 export default BottomNav;
