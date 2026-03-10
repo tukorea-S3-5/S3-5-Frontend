@@ -82,7 +82,7 @@ export default function WeightPage({
         <SectionLabel>이번 주 요약</SectionLabel>
         <GainRow>
           <GainLabel>총 증가량</GainLabel>
-          <GainValue>{totalGain !== null ? `+${totalGain}kg` : '-'}</GainValue>
+          <GainValue>{totalGain !== null ? `${Number(totalGain) >= 0 ? '+' : ''}${totalGain}kg` : '-'}</GainValue>
         </GainRow>
       </SummaryCard>
 
@@ -134,10 +134,10 @@ export default function WeightPage({
         <ChartMeta>
           시작 체중: {baseWeight}kg
           {totalGain !== null && (
-            <> | 현재 증가량: <Accent>+{totalGain}kg</Accent></>
+            <> | 현재 증가량: <Accent>{Number(totalGain) >= 0 ? '+' : ''}{totalGain}kg</Accent></>
           )}
         </ChartMeta>
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={200} style={{ flex: 1 }}>
           <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0e8e5" />
             <XAxis
@@ -149,8 +149,9 @@ export default function WeightPage({
             <YAxis
               tick={{ fontSize: 10, fill: '#8b7e74' }}
               tickLine={false}
-              domain={['auto', 'auto']}
-              label={{ value: '체중 (kg)', angle: -90, position: 'insideLeft', offset: 16, fontSize: 10, fill: '#8b7e74' }}
+              domain={[40, 90]}
+              ticks={[40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90]}
+              label={{ value: 'kg', angle: -90, position: 'insideLeft', offset: 16, fontSize: 10, fill: '#8b7e74' }}
             />
             <Line
               type="monotone"
@@ -172,16 +173,18 @@ const Container = styled.div`
   flex-direction: column;
   gap: ${({ theme }) => theme.spacing.md};
   padding: ${({ theme }) => theme.spacing.md};
-  padding-bottom: 120px;
-  min-height: 100%;
+  padding-bottom: ${({ theme }) => theme.spacing.md};
+  height: 100%;
   background: ${({ theme }) => theme.colors.background};
-  overflow-y: auto;
+  overflow: hidden;
+  box-sizing: border-box;
 `;
 const SummaryCard = styled.div`
   background: ${({ theme }) => theme.colors.white};
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   padding: ${({ theme }) => theme.spacing.md};
   border: 1px solid ${({ theme }) => theme.colors.sub};
+  flex-shrink: 0;
 `;
 const SectionLabel = styled.p`
   ${({ theme }) => theme.typography.caption}
@@ -210,6 +213,12 @@ const RecordCard = styled.div`
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   padding: ${({ theme }) => theme.spacing.md};
   border: 1px solid ${({ theme }) => theme.colors.sub};
+  height: 172px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-shrink: 0;
 `;
 const RecordTitle = styled.p`
   ${({ theme }) => theme.typography.body1}
@@ -291,6 +300,11 @@ const ChartCard = styled.div`
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   padding: ${({ theme }) => theme.spacing.md};
   border: 1px solid ${({ theme }) => theme.colors.sub};
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 `;
 const ChartMeta = styled.p`
   ${({ theme }) => theme.typography.caption}
