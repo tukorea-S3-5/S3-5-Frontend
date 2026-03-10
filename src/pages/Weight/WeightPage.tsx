@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Pencil } from 'lucide-react';
 import {
@@ -10,70 +10,111 @@ import {
   ResponsiveContainer,
   Dot,
 } from 'recharts';
+import { getJson, postJson, putJson } from '../../api/http';
 
 type CardState = 'input' | 'saved' | 'editing';
 
-const DEFAULT_CHART_DATA = [
-  { week: 1, weight: 58 },
-  { week: 3, weight: 58.3 },
-  { week: 5, weight: 58.7 },
-  { week: 7, weight: 59.2 },
-  { week: 9, weight: 59.8 },
-  { week: 11, weight: 60.1 },
-  { week: 13, weight: 60.6 },
-  { week: 15, weight: 61.0 },
-  { week: 17, weight: 61.4 },
-  { week: 20, weight: 62.3 },
-];
+interface WeightLog {
+  weight_log_id: number;
+  pregnancy_id: number;
+  week: number;
+  weight: number;
+  created_at: string;
+}
+
+interface WeightSummary {
+  start_weight: number;
+  current_weight: number;
+  total_gain: number;
+}
+
+interface WeightResponse {
+  summary: WeightSummary;
+  logs: WeightLog[];
+}
 
 interface WeightPageProps {
   currentWeek?: number;
-  baseWeight?: number;
-  weeklyData?: { week: number; weight: number }[];
 }
 
-export default function WeightPage({
-  currentWeek = 20,
-  baseWeight = 58,
-  weeklyData = DEFAULT_CHART_DATA,
-}: WeightPageProps) {
+export default function WeightPage({ currentWeek = 20 }: WeightPageProps) {
+  const [selectedWeek, setSelectedWeek] = useState<number>(currentWeek);
   const [cardState, setCardState] = useState<CardState>('input');
   const [inputValue, setInputValue] = useState('');
-  const [savedWeight, setSavedWeight] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [summary, setSummary] = useState<WeightSummary | null>(null);
+  const [logs, setLogs] = useState<WeightLog[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const totalGain = savedWeight !== null
-    ? (savedWeight - baseWeight).toFixed(1)
-    : null;
+  // 데이터 조회
+  const fetchWeight = async (week?: number) => {
+    try {
+      const res = await getJson<WeightResponse>('/pregnancy/weight');
+      setSummary(res.summary);
+      setLogs(res.logs);
 
-  const chartData = savedWeight !== null
-    ? [...weeklyData.filter(d => d.week < currentWeek), { week: currentWeek, weight: savedWeight }]
-    : weeklyData;
-
-  const handleSave = () => {
-    const val = parseFloat(inputValue);
-    if (!isNaN(val) && val > 0) {
-      setSavedWeight(val);
-      setCardState('saved');
+      const targetWeek = week ?? selectedWeek;
+      const log = res.logs.find(l => l.week === targetWeek);
+      setCardState(log ? 'saved' : 'input');
+    } catch {
+      // 기록 없어도 input 상태 유지
+    } finally {
+      setLoading(false);
     }
   };
 
+  useEffect(() => { fetchWeight(); }, []);
+
+  const handleWeekChange = (week: number) => {
+    setSelectedWeek(week);
+    setInputValue('');
+    setEditValue('');
+    const log = logs.find(l => l.week === week);
+    setCardState(log ? 'saved' : 'input');
+  };
+
+  const thisWeekLog = logs.find(l => l.week === selectedWeek);
+  const chartData = logs
+    .slice()
+    .sort((a, b) => a.week - b.week)
+    .map(l => ({ week: l.week, weight: l.weight }));
+
+  const totalGain = summary?.total_gain ?? null;
+  const baseWeight = summary?.start_weight ?? null;
+
+  // 신규 저장
+  const handleSave = async () => {
+    const val = parseFloat(inputValue);
+    if (isNaN(val) || val <= 0) return;
+    try {
+      await postJson('/pregnancy/weight', { week: selectedWeek, weight: val });
+      await fetchWeight(selectedWeek);
+      setCardState('saved');
+      setInputValue('');
+    } catch {}
+  };
+
+  // 수정 시작
   const handleEdit = () => {
-    setEditValue(String(savedWeight ?? ''));
+    setEditValue(String(thisWeekLog?.weight ?? ''));
     setCardState('editing');
   };
 
-  const handleUpdate = () => {
+  // 수정 저장
+  const handleUpdate = async () => {
     const val = parseFloat(editValue);
-    if (!isNaN(val) && val > 0) {
-      setSavedWeight(val);
+    if (isNaN(val) || val <= 0) return;
+    try {
+      await putJson(`/pregnancy/weight/${selectedWeek}`, { weight: val });
+      await fetchWeight(selectedWeek);
       setCardState('saved');
-    }
+      setEditValue('');
+    } catch {}
   };
 
-  const handleCancel = () => {
-    setCardState('saved');
-  };
+  const handleCancel = () => setCardState('saved');
+
+  if (loading) return <Container><LoadingText>불러오는 중...</LoadingText></Container>;
 
   return (
     <Container>
@@ -82,13 +123,27 @@ export default function WeightPage({
         <SectionLabel>이번 주 요약</SectionLabel>
         <GainRow>
           <GainLabel>총 증가량</GainLabel>
-          <GainValue>{totalGain !== null ? `${Number(totalGain) >= 0 ? '+' : ''}${totalGain}kg` : '-'}</GainValue>
+          <GainValue>
+            {totalGain !== null
+              ? `${totalGain >= 0 ? '+' : ''}${totalGain.toFixed(1)}kg`
+              : '-'}
+          </GainValue>
         </GainRow>
       </SummaryCard>
 
       {/* 체중 기록 카드 */}
       <RecordCard>
-        <RecordTitle>{currentWeek}주차 체중 기록</RecordTitle>
+        <WeekSelectRow>
+          <RecordTitle>체중 기록</RecordTitle>
+          <WeekSelect
+            value={selectedWeek}
+            onChange={e => handleWeekChange(Number(e.target.value))}
+          >
+            {Array.from({ length: currentWeek }, (_, i) => i + 1).map(w => (
+              <option key={w} value={w}>{w}주차</option>
+            ))}
+          </WeekSelect>
+        </WeekSelectRow>
         <RecordSubLabel>현재 체중 (kg)</RecordSubLabel>
 
         {cardState === 'input' && (
@@ -99,13 +154,15 @@ export default function WeightPage({
               onChange={e => setInputValue(e.target.value)}
               placeholder="체중을 입력하세요"
             />
-            <PrimaryButton onClick={handleSave}>체중 기록하기</PrimaryButton>
+            <ButtonRow>
+              <PrimaryButton onClick={handleSave}>체중 기록하기</PrimaryButton>
+            </ButtonRow>
           </>
         )}
 
         {cardState === 'saved' && (
           <SavedRow>
-            <SavedWeight>{savedWeight}</SavedWeight>
+            <SavedWeight>{thisWeekLog?.weight}</SavedWeight>
             <EditButton onClick={handleEdit}>
               <Pencil size={16} />
             </EditButton>
@@ -132,9 +189,9 @@ export default function WeightPage({
       <ChartCard>
         <RecordTitle>체중 변화 추이</RecordTitle>
         <ChartMeta>
-          시작 체중: {baseWeight}kg
+          {baseWeight !== null && <>시작 체중: {baseWeight}kg</>}
           {totalGain !== null && (
-            <> | 현재 증가량: <Accent>{Number(totalGain) >= 0 ? '+' : ''}{totalGain}kg</Accent></>
+            <> | 현재 증가량: <Accent>{totalGain >= 0 ? '+' : ''}{totalGain.toFixed(1)}kg</Accent></>
           )}
         </ChartMeta>
         <ResponsiveContainer width="100%" height={200} style={{ flex: 1 }}>
@@ -179,6 +236,12 @@ const Container = styled.div`
   overflow: hidden;
   box-sizing: border-box;
 `;
+const LoadingText = styled.p`
+  ${({ theme }) => theme.typography.body1}
+  color: ${({ theme }) => theme.colors.subtext};
+  text-align: center;
+  margin-top: ${({ theme }) => theme.spacing.xxl};
+`;
 const SummaryCard = styled.div`
   background: ${({ theme }) => theme.colors.white};
   border-radius: ${({ theme }) => theme.borderRadius.lg};
@@ -213,11 +276,10 @@ const RecordCard = styled.div`
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   padding: ${({ theme }) => theme.spacing.md};
   border: 1px solid ${({ theme }) => theme.colors.sub};
-  height: 172px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  gap: 4px;
   flex-shrink: 0;
 `;
 const RecordTitle = styled.p`
@@ -229,7 +291,7 @@ const RecordTitle = styled.p`
 const RecordSubLabel = styled.p`
   ${({ theme }) => theme.typography.caption}
   color: ${({ theme }) => theme.colors.subtext};
-  margin: 0 0 ${({ theme }) => theme.spacing.sm} 0;
+  margin: 0;
 `;
 const Input = styled.input<{ $focused?: boolean }>`
   width: 100%;
@@ -240,12 +302,10 @@ const Input = styled.input<{ $focused?: boolean }>`
   color: ${({ theme }) => theme.colors.text.primary};
   outline: none;
   box-sizing: border-box;
-  margin-bottom: ${({ theme }) => theme.spacing.sm};
   &:focus { border-color: ${({ theme }) => theme.colors.point}; }
 `;
 const PrimaryButton = styled.button`
   flex: 1;
-  width: 100%;
   height: 48px;
   background: ${({ theme }) => theme.colors.point};
   border: none;
@@ -314,4 +374,21 @@ const ChartMeta = styled.p`
 const Accent = styled.span`
   color: ${({ theme }) => theme.colors.point};
   font-weight: 700;
+`;
+const WeekSelectRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+`;
+const WeekSelect = styled.select`
+  border: 1.5px solid ${({ theme }) => theme.colors.sub};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  padding: 4px 8px;
+  ${({ theme }) => theme.typography.caption}
+  color: ${({ theme }) => theme.colors.text.primary};
+  background: ${({ theme }) => theme.colors.white};
+  outline: none;
+  cursor: pointer;
+  &:focus { border-color: ${({ theme }) => theme.colors.point}; }
 `;
