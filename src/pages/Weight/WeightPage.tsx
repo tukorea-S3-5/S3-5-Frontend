@@ -33,42 +33,65 @@ interface WeightResponse {
   logs: WeightLog[];
 }
 
-interface WeightPageProps {
-  currentWeek?: number;
+interface PregnancyInfo {
+  week: number;
 }
 
-export default function WeightPage({ currentWeek = 20 }: WeightPageProps) {
-  const [selectedWeek, setSelectedWeek] = useState<number>(currentWeek);
+export default function WeightPage() {
+  const [currentWeek, setCurrentWeek] = useState<number>(1);
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [cardState, setCardState] = useState<CardState>('input');
   const [inputValue, setInputValue] = useState('');
   const [editValue, setEditValue] = useState('');
   const [summary, setSummary] = useState<WeightSummary | null>(null);
   const [logs, setLogs] = useState<WeightLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 데이터 조회
+  // 임신 주차 조회
+  const fetchPregnancyInfo = async () => {
+    try {
+      const res = await getJson<PregnancyInfo>('/pregnancy/me');
+      setCurrentWeek(res.week);
+      setSelectedWeek(res.week);
+      return res.week;
+    } catch {
+      setCurrentWeek(40);
+      setSelectedWeek(40);
+      return 40;
+    }
+  };
+
+  // 체중 데이터 조회
   const fetchWeight = async (week?: number) => {
     try {
       const res = await getJson<WeightResponse>('/pregnancy/weight');
       setSummary(res.summary);
       setLogs(res.logs);
-
       const targetWeek = week ?? selectedWeek;
       const log = res.logs.find(l => l.week === targetWeek);
       setCardState(log ? 'saved' : 'input');
-    } catch {
-      // 기록 없어도 input 상태 유지
+    } catch (e: any) {
+      setError('데이터를 불러오지 못했어요. 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchWeight(); }, []);
+  useEffect(() => {
+    (async () => {
+      const week = await fetchPregnancyInfo();
+      await fetchWeight(week);
+    })();
+  }, []);
 
   const handleWeekChange = (week: number) => {
+    if (isSubmitting) return;
     setSelectedWeek(week);
     setInputValue('');
     setEditValue('');
+    setError(null);
     const log = logs.find(l => l.week === week);
     setCardState(log ? 'saved' : 'input');
   };
@@ -85,34 +108,48 @@ export default function WeightPage({ currentWeek = 20 }: WeightPageProps) {
   // 신규 저장
   const handleSave = async () => {
     const val = parseFloat(inputValue);
-    if (isNaN(val) || val <= 0) return;
+    if (isNaN(val) || val <= 0 || isSubmitting) return;
+    setIsSubmitting(true);
+    setError(null);
     try {
       await postJson('/pregnancy/weight', { week: selectedWeek, weight: val });
       await fetchWeight(selectedWeek);
-      setCardState('saved');
       setInputValue('');
-    } catch {}
+    } catch {
+      setError('저장에 실패했어요. 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // 수정 시작
   const handleEdit = () => {
     setEditValue(String(thisWeekLog?.weight ?? ''));
+    setError(null);
     setCardState('editing');
   };
 
   // 수정 저장
   const handleUpdate = async () => {
     const val = parseFloat(editValue);
-    if (isNaN(val) || val <= 0) return;
+    if (isNaN(val) || val <= 0 || isSubmitting) return;
+    setIsSubmitting(true);
+    setError(null);
     try {
       await putJson(`/pregnancy/weight/${selectedWeek}`, { weight: val });
       await fetchWeight(selectedWeek);
-      setCardState('saved');
       setEditValue('');
-    } catch {}
+    } catch {
+      setError('수정에 실패했어요. 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCancel = () => setCardState('saved');
+  const handleCancel = () => {
+    setError(null);
+    setCardState('saved');
+  };
 
   if (loading) return <Container><LoadingText>불러오는 중...</LoadingText></Container>;
 
@@ -138,32 +175,43 @@ export default function WeightPage({ currentWeek = 20 }: WeightPageProps) {
           <WeekSelect
             value={selectedWeek}
             onChange={e => handleWeekChange(Number(e.target.value))}
+            disabled={isSubmitting}
+            aria-label="주차 선택"
           >
             {Array.from({ length: currentWeek }, (_, i) => i + 1).map(w => (
               <option key={w} value={w}>{w}주차</option>
             ))}
           </WeekSelect>
         </WeekSelectRow>
-        <RecordSubLabel>현재 체중 (kg)</RecordSubLabel>
+
+        <label htmlFor="weight-input">
+          <RecordSubLabel>현재 체중 (kg)</RecordSubLabel>
+        </label>
 
         {cardState === 'input' && (
           <>
             <Input
+              id="weight-input"
               type="number"
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               placeholder="체중을 입력하세요"
+              disabled={isSubmitting}
             />
             <ButtonRow>
-              <PrimaryButton onClick={handleSave}>체중 기록하기</PrimaryButton>
+              <PrimaryButton onClick={handleSave} disabled={isSubmitting}>
+                {isSubmitting ? '저장 중...' : '체중 기록하기'}
+              </PrimaryButton>
             </ButtonRow>
           </>
         )}
 
         {cardState === 'saved' && (
           <SavedRow>
-            <SavedWeight>{thisWeekLog?.weight}</SavedWeight>
-            <EditButton onClick={handleEdit}>
+            <SavedWeight aria-label={`${selectedWeek}주차 체중 ${thisWeekLog?.weight}kg`}>
+              {thisWeekLog?.weight}
+            </SavedWeight>
+            <EditButton onClick={handleEdit} aria-label="체중 수정">
               <Pencil size={16} />
             </EditButton>
           </SavedRow>
@@ -172,17 +220,25 @@ export default function WeightPage({ currentWeek = 20 }: WeightPageProps) {
         {cardState === 'editing' && (
           <>
             <Input
+              id="weight-input"
               type="number"
               value={editValue}
               onChange={e => setEditValue(e.target.value)}
               $focused
+              disabled={isSubmitting}
             />
             <ButtonRow>
-              <PrimaryButton onClick={handleUpdate}>저장하기</PrimaryButton>
-              <SecondaryButton onClick={handleCancel}>취소하기</SecondaryButton>
+              <PrimaryButton onClick={handleUpdate} disabled={isSubmitting}>
+                {isSubmitting ? '저장 중...' : '저장하기'}
+              </PrimaryButton>
+              <SecondaryButton onClick={handleCancel} disabled={isSubmitting}>
+                취소하기
+              </SecondaryButton>
             </ButtonRow>
           </>
         )}
+
+        {error && <ErrorText role="alert">{error}</ErrorText>}
       </RecordCard>
 
       {/* 체중 변화 추이 그래프 */}
@@ -286,7 +342,7 @@ const RecordTitle = styled.p`
   ${({ theme }) => theme.typography.body1}
   font-weight: 600;
   color: ${({ theme }) => theme.colors.text.primary};
-  margin: 0 0 4px 0;
+  margin: 0;
 `;
 const RecordSubLabel = styled.p`
   ${({ theme }) => theme.typography.caption}
@@ -303,6 +359,7 @@ const Input = styled.input<{ $focused?: boolean }>`
   outline: none;
   box-sizing: border-box;
   &:focus { border-color: ${({ theme }) => theme.colors.point}; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
 `;
 const PrimaryButton = styled.button`
   flex: 1;
@@ -313,8 +370,9 @@ const PrimaryButton = styled.button`
   color: ${({ theme }) => theme.colors.white};
   ${({ theme }) => theme.typography.button}
   cursor: pointer;
-  &:hover { filter: brightness(0.92); }
-  &:active { transform: scale(0.98); }
+  &:hover:not(:disabled) { filter: brightness(0.92); }
+  &:active:not(:disabled) { transform: scale(0.98); }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
 `;
 const SavedRow = styled.div`
   display: flex;
@@ -343,6 +401,7 @@ const EditButton = styled.button`
 const ButtonRow = styled.div`
   display: flex;
   gap: ${({ theme }) => theme.spacing.sm};
+  margin-top: 4px;
 `;
 const SecondaryButton = styled.button`
   flex: 1;
@@ -353,7 +412,13 @@ const SecondaryButton = styled.button`
   color: ${({ theme }) => theme.colors.point};
   ${({ theme }) => theme.typography.button}
   cursor: pointer;
-  &:hover { filter: brightness(0.95); }
+  &:hover:not(:disabled) { filter: brightness(0.95); }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+`;
+const ErrorText = styled.p`
+  ${({ theme }) => theme.typography.caption}
+  color: ${({ theme }) => theme.colors.point};
+  margin: 4px 0 0 0;
 `;
 const ChartCard = styled.div`
   background: ${({ theme }) => theme.colors.white};
@@ -391,4 +456,5 @@ const WeekSelect = styled.select`
   outline: none;
   cursor: pointer;
   &:focus { border-color: ${({ theme }) => theme.colors.point}; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
 `;
