@@ -185,7 +185,9 @@ export default function WeightPage() {
         </WeekSelectRow>
 
         <label htmlFor="weight-input">
-          <RecordSubLabel>현재 체중 (kg)</RecordSubLabel>
+          <RecordSubLabel>
+            {selectedWeek === currentWeek ? '현재 체중 (kg)' : `${selectedWeek}주차 체중 (kg)`}
+          </RecordSubLabel>
         </label>
 
         {cardState === 'input' && (
