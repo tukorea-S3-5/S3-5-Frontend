@@ -9,7 +9,6 @@ import {
   CartesianGrid,
   ResponsiveContainer,
   Dot,
-  ReferenceLine,
   Tooltip,
 } from 'recharts';
 import { getJson, postJson, putJson } from '../../api/http';
@@ -45,6 +44,14 @@ interface WeightTrend {
 interface PregnancyInfo {
   week: number;
 }
+
+type StatusType = 'normal' | 'excessive' | 'warning';
+
+const getStatusType = (status: string): StatusType => {
+  if (status === '정상 증가 추세') return 'normal';
+  if (status.includes('과도')) return 'excessive';
+  return 'warning';
+};
 
 export default function WeightPage() {
   const [currentWeek, setCurrentWeek] = useState<number>(1);
@@ -98,15 +105,19 @@ export default function WeightPage() {
     }
   };
 
+  const initializeData = async () => {
+    setPregnancyError(false);
+    setLoading(true);
+    try {
+      const week = await fetchPregnancyInfo();
+      await fetchWeight(week);
+    } catch {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    (async () => {
-      try {
-        const week = await fetchPregnancyInfo();
-        await fetchWeight(week);
-      } catch {
-        setLoading(false);
-      }
-    })();
+    initializeData();
   }, []);
 
   const handleWeekChange = (week: number) => {
@@ -193,7 +204,7 @@ export default function WeightPage() {
           </GainValue>
         </GainRow>
         {trend && (
-          <TrendCard status={trend.status}>
+          <TrendCard statusType={getStatusType(trend.status)}>
             <TrendRow>
               <TrendItem>
                 <TrendLabel>최근 4주 평균 증가량</TrendLabel>
@@ -205,7 +216,7 @@ export default function WeightPage() {
                 <TrendValue>{trend.expected_slope.toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
               </TrendItem>
             </TrendRow>
-            <TrendStatus status={trend.status}>
+            <TrendStatus statusType={getStatusType(trend.status)}>
               👉 {trend.status}
             </TrendStatus>
           </TrendCard>
@@ -229,9 +240,7 @@ export default function WeightPage() {
         </WeekSelectRow>
 
         <label htmlFor="weight-input">
-          <RecordSubLabel>
-            {selectedWeek === currentWeek ? '현재 체중 (kg)' : `${selectedWeek}주차 체중 (kg)`}
-          </RecordSubLabel>
+          <RecordSubLabel>현재 체중 (kg)</RecordSubLabel>
         </label>
 
         {cardState === 'input' && (
@@ -287,18 +296,7 @@ export default function WeightPage() {
         {pregnancyError && (
           <ErrorText role="alert">
             임신 정보를 불러올 수 없어요.{' '}
-            <RetryButton onClick={() => {
-              setPregnancyError(false);
-              setLoading(true);
-              (async () => {
-                try {
-                  const week = await fetchPregnancyInfo();
-                  await fetchWeight(week);
-                } catch {
-                  setLoading(false);
-                }
-              })();
-            }}>다시 시도</RetryButton>
+            <RetryButton onClick={initializeData}>다시 시도</RetryButton>
           </ErrorText>
         )}
         {error && <ErrorText role="alert">{error}</ErrorText>}
@@ -314,6 +312,7 @@ export default function WeightPage() {
           )}
         </ChartMeta>
 
+        <div role="img" aria-label="주차별 체중 변화 그래프 — 빨간선은 실제 측정 체중(kg)">
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0e8e5" />
@@ -330,8 +329,8 @@ export default function WeightPage() {
               label={{ value: 'kg', angle: -90, position: 'insideLeft', offset: 16, fontSize: 10, fill: '#8b7e74' }}
             />
             <Tooltip
-              formatter={(v: number) => [`${v}kg`, '체중']}
-              labelFormatter={(l: number) => `${l}주차`}
+              formatter={(v) => [`${v}kg`, '체중']}
+              labelFormatter={(l) => `${l}주차`}
               contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #f0e8e5' }}
             />
             <Line
@@ -344,6 +343,7 @@ export default function WeightPage() {
             />
           </LineChart>
         </ResponsiveContainer>
+        </div>
       </ChartCard>
     </Container>
   );
@@ -377,8 +377,10 @@ const SummaryCard = styled.div`
   flex-direction: column;
   gap: ${({ theme }) => theme.spacing.md};
 `;
-const SectionLabel = styled.h4`
+const SectionLabel = styled.p`
+  ${({ theme }) => theme.typography.caption}
   color: ${({ theme }) => theme.colors.subtext};
+  margin: 0 0 ${({ theme }) => theme.spacing.sm} 0;
 `;
 const GainRow = styled.div`
   display: flex;
@@ -505,13 +507,17 @@ const ChartMeta = styled.p`
   color: ${({ theme }) => theme.colors.subtext};
   margin: 0 0 ${({ theme }) => theme.spacing.md} 0;
 `;
-const TrendCard = styled.div<{ status: string }>`
-  background: ${({ status, theme }) =>
-    status === '정상 증가 추세' ? '#f0faf0' :
-    status.includes('과도') ? '#fff5f5' : '#fffbf0'};
-  border: 1.5px solid ${({ status, theme }) =>
-    status === '정상 증가 추세' ? '#a5d6a7' :
-    status.includes('과도') ? '#ffb3b3' : '#ffe082'};
+const TrendCard = styled.div<{ statusType: StatusType }>`
+  background: ${({ statusType }) => ({
+    normal: '#f0faf0',
+    excessive: '#fff5f5',
+    warning: '#fffbf0',
+  }[statusType])};
+  border: 1.5px solid ${({ statusType }) => ({
+    normal: '#a5d6a7',
+    excessive: '#ffb3b3',
+    warning: '#ffe082',
+  }[statusType])};
   border-radius: ${({ theme }) => theme.borderRadius.md};
   padding: ${({ theme }) => theme.spacing.md};
   display: flex;
@@ -549,11 +555,15 @@ const TrendUnit = styled.span`
   color: ${({ theme }) => theme.colors.subtext};
   margin-left: 1px;
 `;
-const TrendStatus = styled.h5<{ status: string }>`
+const TrendStatus = styled.p<{ statusType: StatusType }>`
+  ${({ theme }) => theme.typography.caption}
   font-weight: 600;
-  color: ${({ status }) =>
-    status === '정상 증가 추세' ? '#2e7d32' :
-    status.includes('과도') ? '#c62828' : '#f57f17'};
+  margin: 0;
+  color: ${({ statusType }) => ({
+    normal: '#2e7d32',
+    excessive: '#c62828',
+    warning: '#f57f17',
+  }[statusType])};
 `;
 const Accent = styled.span`
   color: ${({ theme }) => theme.colors.point};
