@@ -9,6 +9,8 @@ import {
   CartesianGrid,
   ResponsiveContainer,
   Dot,
+  ReferenceLine,
+  Tooltip,
 } from 'recharts';
 import { getJson, postJson, putJson } from '../../api/http';
 
@@ -33,6 +35,13 @@ interface WeightResponse {
   logs: WeightLog[];
 }
 
+interface WeightTrend {
+  based_on: string;
+  slope: number;
+  expected_slope: number;
+  status: string;
+}
+
 interface PregnancyInfo {
   week: number;
 }
@@ -48,6 +57,8 @@ export default function WeightPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pregnancyError, setPregnancyError] = useState(false);
+  const [trend, setTrend] = useState<WeightTrend | null>(null);
 
   // 임신 주차 조회
   const fetchPregnancyInfo = async () => {
@@ -55,25 +66,33 @@ export default function WeightPage() {
       const res = await getJson<PregnancyInfo>('/pregnancy/me');
       setCurrentWeek(res.week);
       setSelectedWeek(res.week);
+      setPregnancyError(false);
       return res.week;
     } catch {
-      setCurrentWeek(40);
-      setSelectedWeek(40);
-      return 40;
+      setPregnancyError(true);
+      throw new Error('임신 정보를 불러올 수 없습니다.');
     }
   };
 
   // 체중 데이터 조회
   const fetchWeight = async (week?: number) => {
     try {
-      const res = await getJson<WeightResponse>('/pregnancy/weight');
-      setSummary(res.summary);
-      setLogs(res.logs);
-      const targetWeek = week ?? selectedWeek;
-      const log = res.logs.find(l => l.week === targetWeek);
-      setCardState(log ? 'saved' : 'input');
-    } catch (e: any) {
-      setError('데이터를 불러오지 못했어요. 다시 시도해주세요.');
+      const [weightRes, trendRes] = await Promise.allSettled([
+        getJson<WeightResponse>('/pregnancy/weight'),
+        getJson<WeightTrend>('/pregnancy/weight-trend'),
+      ]);
+      if (weightRes.status === 'fulfilled') {
+        setSummary(weightRes.value.summary);
+        setLogs(weightRes.value.logs);
+        const targetWeek = week ?? selectedWeek;
+        const log = weightRes.value.logs.find(l => l.week === targetWeek);
+        setCardState(log ? 'saved' : 'input');
+      } else {
+        setError('데이터를 불러오지 못했어요. 다시 시도해주세요.');
+      }
+      if (trendRes.status === 'fulfilled') {
+        setTrend(trendRes.value);
+      }
     } finally {
       setLoading(false);
     }
@@ -81,8 +100,12 @@ export default function WeightPage() {
 
   useEffect(() => {
     (async () => {
-      const week = await fetchPregnancyInfo();
-      await fetchWeight(week);
+      try {
+        const week = await fetchPregnancyInfo();
+        await fetchWeight(week);
+      } catch {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -103,12 +126,15 @@ export default function WeightPage() {
     .map(l => ({ week: l.week, weight: l.weight }));
 
   const totalGain = summary?.total_gain ?? null;
+  const weights = chartData.map(d => d.weight);
+  const minW = weights.length ? Math.floor(Math.min(...weights)) - 2 : 40;
+  const maxW = weights.length ? Math.ceil(Math.max(...weights)) + 2 : 90;
   const baseWeight = summary?.start_weight ?? null;
 
   // 신규 저장
   const handleSave = async () => {
     const val = parseFloat(inputValue);
-    if (isNaN(val) || val <= 0 || isSubmitting) return;
+    if (isNaN(val) || val <= 0 || isSubmitting || pregnancyError) return;
     setIsSubmitting(true);
     setError(null);
     try {
@@ -132,7 +158,7 @@ export default function WeightPage() {
   // 수정 저장
   const handleUpdate = async () => {
     const val = parseFloat(editValue);
-    if (isNaN(val) || val <= 0 || isSubmitting) return;
+    if (isNaN(val) || val <= 0 || isSubmitting || pregnancyError) return;
     setIsSubmitting(true);
     setError(null);
     try {
@@ -155,7 +181,7 @@ export default function WeightPage() {
 
   return (
     <Container>
-      {/* 총 증가량 카드 */}
+      {/* 이번 주 요약 카드 */}
       <SummaryCard>
         <SectionLabel>이번 주 요약</SectionLabel>
         <GainRow>
@@ -166,6 +192,24 @@ export default function WeightPage() {
               : '-'}
           </GainValue>
         </GainRow>
+        {trend && (
+          <TrendCard status={trend.status}>
+            <TrendRow>
+              <TrendItem>
+                <TrendLabel>최근 4주 평균 증가량</TrendLabel>
+                <TrendValue accent>{trend.slope.toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
+              </TrendItem>
+              <TrendDivider />
+              <TrendItem>
+                <TrendLabel>임신 평균 권장 증가량</TrendLabel>
+                <TrendValue>{trend.expected_slope.toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
+              </TrendItem>
+            </TrendRow>
+            <TrendStatus status={trend.status}>
+              👉 {trend.status}
+            </TrendStatus>
+          </TrendCard>
+        )}
       </SummaryCard>
 
       {/* 체중 기록 카드 */}
@@ -199,7 +243,7 @@ export default function WeightPage() {
               disabled={isSubmitting}
             />
             <ButtonRow>
-              <PrimaryButton onClick={handleSave} disabled={isSubmitting}>
+              <PrimaryButton onClick={handleSave} disabled={isSubmitting || pregnancyError}>
                 {isSubmitting ? '저장 중...' : '체중 기록하기'}
               </PrimaryButton>
             </ButtonRow>
@@ -228,7 +272,7 @@ export default function WeightPage() {
               disabled={isSubmitting}
             />
             <ButtonRow>
-              <PrimaryButton onClick={handleUpdate} disabled={isSubmitting}>
+              <PrimaryButton onClick={handleUpdate} disabled={isSubmitting || pregnancyError}>
                 {isSubmitting ? '저장 중...' : '저장하기'}
               </PrimaryButton>
               <SecondaryButton onClick={handleCancel} disabled={isSubmitting}>
@@ -238,6 +282,23 @@ export default function WeightPage() {
           </>
         )}
 
+        {pregnancyError && (
+          <ErrorText role="alert">
+            임신 정보를 불러올 수 없어요.{' '}
+            <RetryButton onClick={() => {
+              setPregnancyError(false);
+              setLoading(true);
+              (async () => {
+                try {
+                  const week = await fetchPregnancyInfo();
+                  await fetchWeight(week);
+                } catch {
+                  setLoading(false);
+                }
+              })();
+            }}>다시 시도</RetryButton>
+          </ErrorText>
+        )}
         {error && <ErrorText role="alert">{error}</ErrorText>}
       </RecordCard>
 
@@ -250,7 +311,8 @@ export default function WeightPage() {
             <> | 현재 증가량: <Accent>{totalGain >= 0 ? '+' : ''}{totalGain.toFixed(1)}kg</Accent></>
           )}
         </ChartMeta>
-        <ResponsiveContainer width="100%" height={200} style={{ flex: 1 }}>
+
+        <ResponsiveContainer width="100%" height={320}>
           <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0e8e5" />
             <XAxis
@@ -262,9 +324,13 @@ export default function WeightPage() {
             <YAxis
               tick={{ fontSize: 10, fill: '#8b7e74' }}
               tickLine={false}
-              domain={[40, 90]}
-              ticks={[40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90]}
+              domain={[minW, maxW]}
               label={{ value: 'kg', angle: -90, position: 'insideLeft', offset: 16, fontSize: 10, fill: '#8b7e74' }}
+            />
+            <Tooltip
+              formatter={(v: number) => [`${v}kg`, '체중']}
+              labelFormatter={(l: number) => `${l}주차`}
+              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #f0e8e5' }}
             />
             <Line
               type="monotone"
@@ -287,7 +353,8 @@ const Container = styled.div`
   gap: ${({ theme }) => theme.spacing.md};
   padding: ${({ theme }) => theme.spacing.md};
   padding-bottom: ${({ theme }) => theme.spacing.md};
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   background: ${({ theme }) => theme.colors.background};
   overflow: hidden;
   box-sizing: border-box;
@@ -304,11 +371,12 @@ const SummaryCard = styled.div`
   padding: ${({ theme }) => theme.spacing.md};
   border: 1px solid ${({ theme }) => theme.colors.sub};
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
 `;
-const SectionLabel = styled.p`
-  ${({ theme }) => theme.typography.caption}
+const SectionLabel = styled.h4`
   color: ${({ theme }) => theme.colors.subtext};
-  margin: 0 0 ${({ theme }) => theme.spacing.sm} 0;
 `;
 const GainRow = styled.div`
   display: flex;
@@ -426,15 +494,64 @@ const ChartCard = styled.div`
   padding: ${({ theme }) => theme.spacing.md};
   border: 1px solid ${({ theme }) => theme.colors.sub};
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
 `;
 const ChartMeta = styled.p`
   ${({ theme }) => theme.typography.caption}
   color: ${({ theme }) => theme.colors.subtext};
   margin: 0 0 ${({ theme }) => theme.spacing.md} 0;
+`;
+const TrendCard = styled.div<{ status: string }>`
+  background: ${({ status, theme }) =>
+    status === '정상 증가 추세' ? '#f0faf0' :
+    status.includes('과도') ? '#fff5f5' : '#fffbf0'};
+  border: 1.5px solid ${({ status, theme }) =>
+    status === '정상 증가 추세' ? '#a5d6a7' :
+    status.includes('과도') ? '#ffb3b3' : '#ffe082'};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  padding: ${({ theme }) => theme.spacing.md};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+const TrendRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+const TrendItem = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+`;
+const TrendDivider = styled.div`
+  width: 1px;
+  height: 32px;
+  background: ${({ theme }) => theme.colors.sub};
+`;
+const TrendLabel = styled.span`
+  ${({ theme }) => theme.typography.caption}
+  color: ${({ theme }) => theme.colors.subtext};
+`;
+const TrendValue = styled.span<{ accent?: boolean }>`
+  font-size: 15px;
+  font-weight: 700;
+  color: ${({ accent, theme }) => accent ? theme.colors.point : theme.colors.text.primary};
+`;
+const TrendUnit = styled.span`
+  font-size: 10px;
+  font-weight: 400;
+  color: ${({ theme }) => theme.colors.subtext};
+  margin-left: 1px;
+`;
+const TrendStatus = styled.h5<{ status: string }>`
+  font-weight: 600;
+  color: ${({ status }) =>
+    status === '정상 증가 추세' ? '#2e7d32' :
+    status.includes('과도') ? '#c62828' : '#f57f17'};
 `;
 const Accent = styled.span`
   color: ${({ theme }) => theme.colors.point};
@@ -445,6 +562,16 @@ const WeekSelectRow = styled.div`
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
+`;
+const RetryButton = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.colors.point};
+  ${({ theme }) => theme.typography.caption}
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
 `;
 const WeekSelect = styled.select`
   border: 1.5px solid ${({ theme }) => theme.colors.sub};

@@ -18,6 +18,7 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import LoadingOverlay from "./components/LoadingOverlay";
 import ReportPage from "./pages/Exercise/ReportPage";
 import PregnancyOnboardingPage from "./pages/PregnancyOnboarding/PregnancyOnboardingPage";
+import ExerciseListPage from "./pages/ExerciseList/ExerciseListPage";
 
 function App() {
   return (
@@ -99,6 +100,7 @@ function AppRoutes() {
         <Route element={<Layout />}>
           <Route path="home" element={<HomePage />} />
           <Route path="weight" element={<WeightPage />} />
+          <Route path="exercises" element={<ExerciseListPage />} />
           <Route path="exercise" element={<ExercisePage />} />
           <Route path="report" element={<ReportPage />} />
           <Route
