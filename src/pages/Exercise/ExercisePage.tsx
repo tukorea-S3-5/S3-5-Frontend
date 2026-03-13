@@ -104,7 +104,7 @@ export default function ExercisePage() {
         },
       },
     });
-  }, [ytReady, currentIndex, isConnected]);
+  }, [ytReady, currentIndex, isConnected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 경과 시간 타이머
   useEffect(() => {
@@ -121,8 +121,16 @@ export default function ExercisePage() {
   // record/end → 다음 운동 또는 완료
   const handleRecordEnd = async (exerciseId: number, onDone: () => void) => {
     const recordId = getRecordId(exerciseId);
+    console.log('[record/end] exerciseId:', exerciseId, '| recordId:', recordId);
     if (recordId) {
-      try { await postJson('/exercise/record/end', { record_id: recordId }); } catch { }
+      try {
+        const res = await postJson('/exercise/record/end', { record_id: recordId });
+        console.log('[record/end] 성공:', res);
+      } catch (e) {
+        console.error('[record/end] 실패:', e);
+      }
+    } else {
+      console.warn('[record/end] recordId 없음 - session.records:', JSON.stringify(session?.records));
     }
     onDone();
   };
@@ -130,8 +138,14 @@ export default function ExercisePage() {
   // record/pause
   const handleRecordPause = async () => {
     const recordId = getActiveRecordId();
+    console.log('[record/pause] recordId:', recordId, '| playState:', playState);
     if (recordId) {
-      try { await postJson('/exercise/record/pause', { record_id: recordId }); } catch { }
+      try {
+        const res = await postJson('/exercise/record/pause', { record_id: recordId });
+        console.log('[record/pause] 성공:', res);
+      } catch (e) {
+        console.error('[record/pause] 실패:', e);
+      }
     }
   };
 
@@ -139,20 +153,30 @@ export default function ExercisePage() {
   const handleRecordResume = async () => {
     const recordId = getActiveRecordId();
     if (recordId) {
-      try { await postJson('/exercise/record/resume', { record_id: recordId }); } catch { }
+      try { await postJson('/exercise/record/resume', { record_id: recordId }); } catch { /* fire-and-forget */ }
     }
   };
 
-  // session/abort
-  const handleSessionAbort = async () => {
-    if (session?.session_id) {
-      try { await postJson('/exercise/session/abort', { session_id: session.session_id }); } catch { }
+  // 중도 종료 - 현재 진행 중인 record/end 호출 → 마지막이면 자동 COMPLETED
+  const handleSessionEnd = async () => {
+    const recordId = getActiveRecordId();
+    console.log('[session/end] 중도종료 | recordId:', recordId, '| session_id:', session?.session_id);
+    if (recordId) {
+      try {
+        const res = await postJson('/exercise/record/end', { record_id: recordId });
+        console.log('[session/end] record/end 성공:', res);
+      } catch (e) {
+        console.error('[session/end] record/end 실패:', e);
+      }
     }
   };
 
   const goNext = () => setCurrentIndex(p => p + 1);
 
-  const finishAll = () => navigate('/report', { state: { exercises, sessionId: session?.session_id } });
+  const finishAll = () => {
+    console.log('[finishAll] sessionId:', session?.session_id);
+    navigate('/report', { state: { exercises, sessionId: session?.session_id } });
+  };
 
   const handleStart = () => {
     playerRef.current?.playVideo();
@@ -162,9 +186,6 @@ export default function ExercisePage() {
   const handlePause = async () => {
     playerRef.current?.pauseVideo();
     setPlayState('paused');
-    console.log('[pause] session:', session);
-    console.log('[pause] current.id:', current.id, typeof current.id);
-    console.log('[pause] recordId:', getRecordId(current.id));
     await handleRecordPause();
   };
 
@@ -185,15 +206,19 @@ export default function ExercisePage() {
   const handleStopAll = () => setStopModal(true);
   const handleStopConfirm = async () => {
     setStopModal(false);
-    await handleSessionAbort();
+    await handleSessionEnd();
     finishAll();
   };
 
   const handleSwitchConfirm = async () => {
     const target = switchModal.targetIndex;
     setSwitchModal({ open: false, targetIndex: 0 });
-    // 현재 운동 pause 처리 후 전환
-    await handleRecordPause();
+    // playing 상태일 때만 pause 처리 (idle이면 record/start 안 됐으므로 스킵)
+    if (playState === 'playing') {
+      playerRef.current?.pauseVideo();
+      setPlayState('paused');
+      await handleRecordPause();
+    }
     setCurrentIndex(target);
   };
 
