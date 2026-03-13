@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import SymptomChecker from './components/SymptomChecker';
-import { getJson, postJson } from '../../api/http';
+import { postJson } from '../../api/http';
 
 interface Symptom {
   id: string;
@@ -12,61 +11,28 @@ interface Symptom {
   checked: boolean;
 }
 
-interface PregnancyInfo {
-  week: number;
-  trimester: number;
-  total_gain: number;
-  due_date: string;
+// SymptomChecker label → API 코드 매핑
+
+
+interface HomePageProps {
+  weekNumber?: number;
+  currentWeek?: number;
+  remainingWeeks?: number;
+  weightGain?: number;
+  babySize?: string;
+  recommendedWeightRange?: string;
 }
 
-interface WeeklyHealth {
-  week: number;
-  recommended_weight_gain: string;
-  common_symptoms: string[];
-  today_tip: string;
-}
-
-interface Guideline {
-  week: number;
-  trimester: number;
-  title: string;
-  guidelines: string[];
-}
-
-const TRIMESTER_LABEL: Record<number, string> = {
-  1: '1분기',
-  2: '2분기',
-  3: '3분기',
-};
-
-export default function HomePage() {
+export default function HomePage({
+  weekNumber = 40,
+  currentWeek = 20,
+  remainingWeeks = 40,
+  weightGain = 0.0,
+  babySize = '작은 호박 크기',
+  recommendedWeightRange = '13-16kg',
+}: HomePageProps) {
   const navigate = useNavigate();
-
-  const [pregnancy, setPregnancy] = useState<PregnancyInfo | null>(null);
-  const [weeklyHealth, setWeeklyHealth] = useState<WeeklyHealth | null>(null);
-  const [guideline, setGuideline] = useState<Guideline | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.allSettled([
-      getJson<PregnancyInfo>('/pregnancy/me'),
-      getJson<WeeklyHealth>('/pregnancy/weekly-health'),
-      getJson<Guideline>('/pregnancy/guideline'),
-    ]).then(([pregnancyRes, healthRes, guidelineRes]) => {
-      if (pregnancyRes.status === 'fulfilled') setPregnancy(pregnancyRes.value);
-      if (healthRes.status === 'fulfilled') setWeeklyHealth(healthRes.value);
-      if (guidelineRes.status === 'fulfilled') setGuideline(guidelineRes.value);
-    }).finally(() => setLoading(false));
-  }, []);
-
-  const week = pregnancy?.week ?? 0;
-  const remainingWeeks = Math.max(40 - week, 0);
-  const progressPercentage = Math.min((week / 40) * 100, 100);
-  const trimesterLabel = TRIMESTER_LABEL[pregnancy?.trimester ?? 1] ?? '';
-  const totalGain = pregnancy?.total_gain ?? 0;
-  const dueDate = pregnancy?.due_date
-    ? new Date(pregnancy.due_date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
-    : '';
+  const progressPercentage = (currentWeek / 40) * 100;
 
   const handleSymptomSubmit = async (symptoms: Symptom[]) => {
     const codes = symptoms.map(s => s.code);
@@ -79,34 +45,30 @@ export default function HomePage() {
   };
 
   const handleNoSymptom = () => {
+    // 증상 없음 → /symptom 호출 없이 바로 이동 (빈 배열은 validation 에러)
     navigate('/exercises');
   };
 
-  if (loading) return <Container><LoadingText>불러오는 중...</LoadingText></Container>;
-
   return (
     <Container>
-      {/* 임신 진행 카드 */}
       <PregnancyCard>
         <PregnancyMeta>현재 임신</PregnancyMeta>
-        <PregnancyWeek>{week}주차</PregnancyWeek>
-        <PregnancyTrimester>
-          {trimesterLabel}{dueDate ? ` • 출산 예정일 ${dueDate}` : ''}
-        </PregnancyTrimester>
+        <PregnancyWeek>{weekNumber}주차</PregnancyWeek>
+        <PregnancyTrimester>3분기 • 출산 예정일</PregnancyTrimester>
 
         <InfoRow>
           <InfoBox>
             <InfoLabel>⚡ 체중 증가</InfoLabel>
-            <InfoValue>{totalGain >= 0 ? '+' : ''}{totalGain.toFixed(1)}kg</InfoValue>
+            <InfoValue>+{weightGain.toFixed(1)}kg</InfoValue>
           </InfoBox>
           <InfoBox>
-            <InfoLabel>📅 출산까지</InfoLabel>
-            <InfoValue>{remainingWeeks}주 남음</InfoValue>
+            <InfoLabel>🍼 아기 크기</InfoLabel>
+            <InfoValue $small>{babySize}</InfoValue>
           </InfoBox>
         </InfoRow>
 
         <ProgressRow>
-          <ProgressLabel>현재 <strong>{week}주차</strong></ProgressLabel>
+          <ProgressLabel>현재 <strong>{currentWeek}주차</strong></ProgressLabel>
           <ProgressLabel>남은 기간 <strong>{remainingWeeks}주</strong></ProgressLabel>
         </ProgressRow>
         <ProgressBarTrack>
@@ -114,51 +76,36 @@ export default function HomePage() {
         </ProgressBarTrack>
       </PregnancyCard>
 
-      {/* 증상 체커 */}
       <SymptomChecker
         onSubmit={handleSymptomSubmit}
         onNoSymptom={handleNoSymptom}
       />
 
-      {/* 주차별 건강 정보 */}
-      {weeklyHealth && (
-        <HealthCard>
-          <HealthTitle>➕ 이번 주 건강 정보</HealthTitle>
+      <HealthCard>
+        <HealthTitle>➕ 이번 주 건강 정보</HealthTitle>
 
-          <HealthSection>
-            <HealthSectionLabel>권장 체중 증가</HealthSectionLabel>
-            <HealthSectionValue>{weeklyHealth.recommended_weight_gain}</HealthSectionValue>
-          </HealthSection>
+        <HealthSection>
+          <HealthSectionLabel>권장 체중 증가</HealthSectionLabel>
+          <HealthSectionValue>{recommendedWeightRange}</HealthSectionValue>
+        </HealthSection>
 
-          <Divider />
+        <Divider />
 
-          <HealthSectionTitle>관련 증상</HealthSectionTitle>
-          <HealthList>
-            {weeklyHealth.common_symptoms.map((s, i) => (
-              <HealthListItem key={i}>{s}</HealthListItem>
-            ))}
-          </HealthList>
+        <HealthSectionTitle>관련 증상</HealthSectionTitle>
+        <HealthList>
+          <HealthListItem>갑작스런 수축</HealthListItem>
+          <HealthListItem>양수 터짐 가능</HealthListItem>
+          <HealthListItem>진통</HealthListItem>
+        </HealthList>
 
-          <Divider />
+        <Divider />
 
-          <HealthSectionTitle $accent>오늘의 팁</HealthSectionTitle>
-          <HealthList>
-            <HealthListItem>{weeklyHealth.today_tip}</HealthListItem>
-          </HealthList>
-        </HealthCard>
-      )}
-
-      {/* 분기별 운동 가이드라인 */}
-      {guideline && (
-        <GuidelineCard>
-          <HealthTitle>🏃 {guideline.title}</HealthTitle>
-          <HealthList>
-            {guideline.guidelines.map((g, i) => (
-              <HealthListItem key={i}>{g}</HealthListItem>
-            ))}
-          </HealthList>
-        </GuidelineCard>
-      )}
+        <HealthSectionTitle $accent>오늘의 팁</HealthSectionTitle>
+        <HealthList>
+          <HealthListItem>즉시 병원 방문</HealthListItem>
+          <HealthListItem>차분하게 호흡</HealthListItem>
+        </HealthList>
+      </HealthCard>
     </Container>
   );
 }
@@ -170,12 +117,6 @@ const Container = styled.div`
   padding: ${({ theme }) => theme.spacing.md};
   padding-bottom: 120px;
   min-height: 100%;
-`;
-const LoadingText = styled.p`
-  ${({ theme }) => theme.typography.body1}
-  color: ${({ theme }) => theme.colors.subtext};
-  text-align: center;
-  margin-top: ${({ theme }) => theme.spacing.xxl};
 `;
 const PregnancyCard = styled.div`
   background: ${({ theme }) => theme.colors.light};
@@ -220,8 +161,8 @@ const InfoLabel = styled.span`
   color: ${({ theme }) => theme.colors.point};
   white-space: nowrap;
 `;
-const InfoValue = styled.span`
-  font-size: 18px;
+const InfoValue = styled.span<{ $small?: boolean }>`
+  font-size: ${({ $small }) => $small ? '14px' : '18px'};
   font-weight: 700;
   color: ${({ theme }) => theme.colors.point};
   white-space: nowrap;
@@ -252,12 +193,6 @@ const ProgressBarFill = styled.div`
   transition: width 0.3s ease;
 `;
 const HealthCard = styled.div`
-  background: ${({ theme }) => theme.colors.white};
-  border: 1px solid ${({ theme }) => theme.colors.sub};
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
-  padding: ${({ theme }) => theme.spacing.lg};
-`;
-const GuidelineCard = styled.div`
   background: ${({ theme }) => theme.colors.white};
   border: 1px solid ${({ theme }) => theme.colors.sub};
   border-radius: ${({ theme }) => theme.borderRadius.lg};
