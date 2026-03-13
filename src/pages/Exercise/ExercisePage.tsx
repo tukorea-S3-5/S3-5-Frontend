@@ -71,7 +71,7 @@ export default function ExercisePage() {
 
   // YouTube IFrame API 로드
   useEffect(() => {
-    if (window.YT) { setYtReady(true); return; }
+    if (window.YT?.Player) { setYtReady(true); return; }
     const tag = document.createElement('script');
     tag.src = 'https://www.youtube.com/iframe_api';
     document.head.appendChild(tag);
@@ -104,7 +104,7 @@ export default function ExercisePage() {
         },
       },
     });
-  }, [ytReady, currentIndex]);
+  }, [ytReady, currentIndex, isConnected]);
 
   // 경과 시간 타이머
   useEffect(() => {
@@ -162,6 +162,9 @@ export default function ExercisePage() {
   const handlePause = async () => {
     playerRef.current?.pauseVideo();
     setPlayState('paused');
+    console.log('[pause] session:', session);
+    console.log('[pause] current.id:', current.id, typeof current.id);
+    console.log('[pause] recordId:', getRecordId(current.id));
     await handleRecordPause();
   };
 
