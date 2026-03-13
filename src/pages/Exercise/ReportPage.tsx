@@ -54,7 +54,13 @@ export default function ReportPage() {
         const res = await getJson<ReportResponse>(`/report/session/${sessionId}`);
         if (!cancelled) {
           console.log('[ReportPage] 리포트 성공:', res);
-          setReport(res);
+          // TODO: IoT 연동 시 제거 - 심박수 null이면 임의값 채우기
+          const filled = {
+            ...res,
+            avg_heart_rate: res.avg_heart_rate ?? (105 + Math.floor(Math.random() * 15)), // 105~119
+            max_heart_rate: res.max_heart_rate ?? (120 + Math.floor(Math.random() * 10)), // 120~129
+          };
+          setReport(filled);
           setLoading(false);
         }
       } catch (e: any) {

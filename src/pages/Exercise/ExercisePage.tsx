@@ -44,13 +44,15 @@ const toVideoId = (url: string) =>
 export default function ExercisePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { exercises, currentHeartRate = 0, session } = (location.state as {
+  const { exercises, session } = (location.state as {
     exercises: Exercise[];
-    currentHeartRate?: number;
     session?: { session_id: number; records: SessionRecord[] };
   }) ?? { exercises: [] };
 
   const [isConnected, setIsConnected] = useState(false);
+  // TODO: IoT 연동 시 실제 심박수로 교체
+  const [heartRate, setHeartRate] = useState(75);
+  const heartRateRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playState, setPlayState] = useState<PlayState>('idle');
   const [duration, setDuration] = useState(0);
@@ -114,6 +116,24 @@ export default function ExercisePage() {
       if (timerRef.current) clearInterval(timerRef.current);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [playState]);
+
+  // TODO: IoT 연동 시 제거 - 심박수 시뮬레이션 (운동 중 110~145, 정지 시 70~85)
+  useEffect(() => {
+    if (playState === 'playing') {
+      heartRateRef.current = setInterval(() => {
+        setHeartRate(prev => {
+          const target = 100 + Math.floor(Math.random() * 25); // 100~124 (임산부 권장 범위)
+          return Math.round(prev + (target - prev) * 0.3); // 부드럽게 변화
+        });
+      }, 2000);
+    } else {
+      if (heartRateRef.current) clearInterval(heartRateRef.current);
+      if (playState === 'paused' || playState === 'idle') {
+        setHeartRate(prev => Math.round(prev + (78 - prev) * 0.3)); // 서서히 안정
+      }
+    }
+    return () => { if (heartRateRef.current) clearInterval(heartRateRef.current); };
   }, [playState]);
 
   const getActiveRecordId = () => getRecordId(current.id);
@@ -236,7 +256,6 @@ export default function ExercisePage() {
         <Container>
           <Header>
             <PageTitle>영상을 보고 따라해보세요!</PageTitle>
-            <StopAllButton onClick={handleStopAll}>운동 종료</StopAllButton>
           </Header>
 
           <VideoBox>
@@ -250,7 +269,7 @@ export default function ExercisePage() {
             </StatCard>
             <StatCard>
               <StatLabel>❤️ 심박수</StatLabel>
-              <StatValue>{currentHeartRate}<StatUnit>bpm</StatUnit></StatValue>
+              <StatValue>{heartRate}<StatUnit>bpm</StatUnit></StatValue>
             </StatCard>
           </StatsRow>
 
@@ -293,6 +312,11 @@ export default function ExercisePage() {
               />
             ))}
           </ListSection>
+
+          <EmergencyStop onClick={handleStopAll}>
+            ⚠️ 몸이 불편하거나 운동을 중단해야 한다면
+            <EmergencyStopLabel>지금 바로 운동 중단하기</EmergencyStopLabel>
+          </EmergencyStop>
 
           {/* 전체 운동 종료 모달 */}
           <Modal isOpen={stopModal} onClose={() => setStopModal(false)} showCloseButton={false}>
@@ -344,14 +368,42 @@ const PageTitle = styled.h1`
 `;
 const StopAllButton = styled.button`
   ${({ theme }) => theme.typography.caption}
-  color: ${({ theme }) => theme.colors.subtext};
-  background: transparent;
-  border: 1px solid ${({ theme }) => theme.colors.sub};
+  font-weight: 600;
+  color: #e53935;
+  background: #fff5f5;
+  border: 1.5px solid #e53935;
   border-radius: ${({ theme }) => theme.borderRadius.full};
   padding: 6px 14px;
   cursor: pointer;
   white-space: nowrap;
-  &:hover { border-color: ${({ theme }) => theme.colors.point}; color: ${({ theme }) => theme.colors.point}; }
+  transition: all 0.2s;
+  &:hover { background: #ffebee; }
+  &:active { transform: scale(0.97); }
+`;
+const EmergencyStop = styled.button`
+  width: 100%;
+  margin-top: ${({ theme }) => theme.spacing.lg};
+  padding: 18px 16px 14px;
+  background: #fff5f5;
+  border: 2px solid #e53935;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  color: #e53935;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  ${({ theme }) => theme.typography.caption}
+  font-weight: 500;
+  transition: all 0.2s;
+  &:hover { background: #ffebee; }
+  &:active { transform: scale(0.98); }
+`;
+const EmergencyStopLabel = styled.span`
+  font-size: 17px;
+  font-weight: 700;
+  color: #e53935;
+  letter-spacing: -0.3px;
 `;
 const VideoBox = styled.div`
   width: 100%;
