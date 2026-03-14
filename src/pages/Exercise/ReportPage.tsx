@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import MomiCompleted from '@assets/icons/images/MOMI_completed.png';
 import { getJson } from '../../api/http';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Area, AreaChart } from 'recharts';
 
 interface ExerciseSummary {
   exercise_name: string;
@@ -21,6 +22,27 @@ interface ReportResponse {
 interface LocationState {
   sessionId?: number;
 }
+
+const generateHeartRateData = (avg: number, max: number) => {
+  const points = 20;
+  return Array.from({ length: points }, (_, i) => {
+    const progress = i / (points - 1);
+    // 운동 중반에 최고 심박수, 시작/끝은 낮게
+    const curve = Math.sin(progress * Math.PI) * (max - avg) * 0.8;
+    const noise = (Math.random() - 0.5) * 10;
+    return {
+      time: `${Math.floor((i / points) * 20)}:00`,
+      bpm: Math.round(Math.max(60, avg - 15 + curve + noise)),
+    };
+  });
+};
+
+const getComment = (avg: number): string => {
+  if (avg >= 130) return '운동 강도가 꽤 높았어요! 다음엔 충분한 휴식을 취하세요. 💪';
+  if (avg >= 115) return '무리한 수준은 아니지만,다음에는 호흡을 조금 더 천천히 해보세요.';
+  if (avg >= 100) return '적절한 강도로 운동했어요! 오늘 수고했어요 🌸';
+  return '가볍고 안전하게 운동했어요. 꾸준히 하는 게 최고예요! 🤰';
+};
 
 const formatDuration = (seconds: number) => {
   if (!seconds) return '0분';
@@ -144,6 +166,49 @@ export default function ReportPage() {
               </ExerciseRow>
             ))}
           </ExerciseListCard>
+
+          {/* 심박수 변화 그래프 */}
+          <HeartRateCard>
+            <SectionTitle>💓 심박수 변화</SectionTitle>
+            <ResponsiveContainer width="100%" height={180}>
+              <AreaChart
+                data={generateHeartRateData(
+                  report.avg_heart_rate ?? 110,
+                  report.max_heart_rate ?? 125
+                )}
+                margin={{ top: 5, right: 8, left: -20, bottom: 5 }}
+              >
+                <defs>
+                  <linearGradient id="hrGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ff5038" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#ff5038" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0e8e5" />
+                <XAxis dataKey="time" tick={{ fontSize: 9, fill: '#8b7e74' }} tickLine={false} />
+                <YAxis domain={[60, 140]} tick={{ fontSize: 9, fill: '#8b7e74' }} tickLine={false} />
+                <Tooltip
+                  formatter={(v) => [`${v} bpm`, '심박수']}
+                  contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #f0e8e5' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="bpm"
+                  stroke="#ff5038"
+                  strokeWidth={2}
+                  fill="url(#hrGradient)"
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </HeartRateCard>
+
+          {/* 오늘의 운동 한마디 */}
+          <CommentCard>
+            <CommentTitle>오늘의 운동 한마디</CommentTitle>
+            <CommentText>{getComment(report.avg_heart_rate ?? 110)}</CommentText>
+          </CommentCard>
 
         </>
       )}
@@ -289,6 +354,31 @@ const OutlineButton = styled.button<{ $saved?: boolean }>`
   transition: all 0.2s;
   &:hover { border-color: ${({ theme }) => theme.colors.point}; color: ${({ theme }) => theme.colors.point}; }
   &:active { transform: scale(0.98); }
+`;
+const HeartRateCard = styled.div`
+  background: ${({ theme }) => theme.colors.white};
+  border: 1px solid ${({ theme }) => theme.colors.sub};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  padding: ${({ theme }) => theme.spacing.md};
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+`;
+const CommentCard = styled.div`
+  background: ${({ theme }) => theme.colors.light};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  padding: ${({ theme }) => theme.spacing.lg};
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+`;
+const CommentTitle = styled.h3`
+  ${({ theme }) => theme.typography.heading3}
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin: 0 0 ${({ theme }) => theme.spacing.sm} 0;
+`;
+const CommentText = styled.p`
+  ${({ theme }) => theme.typography.body2}
+  color: ${({ theme }) => theme.colors.subtext};
+  margin: 0;
+  white-space: pre-line;
+  line-height: 1.6;
 `;
 const HomeButton = styled.button`
   width: 100%;

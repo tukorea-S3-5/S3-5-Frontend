@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import SymptomChecker from './components/SymptomChecker';
-import { postJson } from '../../api/http';
+import { getJson, postJson } from '../../api/http';
 
 interface Symptom {
   id: string;
@@ -11,28 +12,53 @@ interface Symptom {
   checked: boolean;
 }
 
-// SymptomChecker label → API 코드 매핑
-
-
-interface HomePageProps {
-  weekNumber?: number;
-  currentWeek?: number;
-  remainingWeeks?: number;
-  weightGain?: number;
-  babySize?: string;
-  recommendedWeightRange?: string;
+interface PregnancyInfo {
+  week: number;
+  trimester: number;
+  total_gain: number;
+  due_date: string;
 }
 
-export default function HomePage({
-  weekNumber = 40,
-  currentWeek = 20,
-  remainingWeeks = 40,
-  weightGain = 0.0,
-  babySize = '작은 호박 크기',
-  recommendedWeightRange = '13-16kg',
-}: HomePageProps) {
+interface WeeklyHealth {
+  week: number;
+  recommended_weight_gain: string;
+  common_symptoms: string[];
+  today_tip: string;
+}
+
+const TRIMESTER_LABEL: Record<number, string> = {
+  1: '1분기',
+  2: '2분기',
+  3: '3분기',
+};
+
+export default function HomePage() {
   const navigate = useNavigate();
-  const progressPercentage = (currentWeek / 40) * 100;
+
+  const [pregnancy, setPregnancy] = useState<PregnancyInfo | null>(null);
+  const [weeklyHealth, setWeeklyHealth] = useState<WeeklyHealth | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.allSettled([
+      getJson<PregnancyInfo>('/pregnancy/me'),
+      getJson<WeeklyHealth>('/pregnancy/weekly-health'),
+    ]).then(([pregnancyRes, healthRes]) => {
+      console.log('[HomePage] pregnancy:', pregnancyRes);
+      console.log('[HomePage] weeklyHealth:', healthRes);
+      if (pregnancyRes.status === 'fulfilled') setPregnancy(pregnancyRes.value);
+      if (healthRes.status === 'fulfilled') setWeeklyHealth(healthRes.value);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const week = pregnancy?.week ?? 0;
+  const remainingWeeks = Math.max(40 - week, 0);
+  const progressPercentage = Math.min((week / 40) * 100, 100);
+  const trimesterLabel = TRIMESTER_LABEL[pregnancy?.trimester ?? 1] ?? '';
+  const totalGain = pregnancy?.total_gain ?? 0;
+  const dueDate = pregnancy?.due_date
+    ? new Date(pregnancy.due_date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+    : '';
 
   const handleSymptomSubmit = async (symptoms: Symptom[]) => {
     const codes = symptoms.map(s => s.code);
@@ -45,30 +71,33 @@ export default function HomePage({
   };
 
   const handleNoSymptom = () => {
-    // 증상 없음 → /symptom 호출 없이 바로 이동 (빈 배열은 validation 에러)
     navigate('/exercises');
   };
+
+  if (loading) return <Container><LoadingText>불러오는 중...</LoadingText></Container>;
 
   return (
     <Container>
       <PregnancyCard>
         <PregnancyMeta>현재 임신</PregnancyMeta>
-        <PregnancyWeek>{weekNumber}주차</PregnancyWeek>
-        <PregnancyTrimester>3분기 • 출산 예정일</PregnancyTrimester>
+        <PregnancyWeek>{week}주차</PregnancyWeek>
+        <PregnancyTrimester>
+          {trimesterLabel}{dueDate ? ` • 출산 예정일 ${dueDate}` : ''}
+        </PregnancyTrimester>
 
         <InfoRow>
           <InfoBox>
             <InfoLabel>⚡ 체중 증가</InfoLabel>
-            <InfoValue>+{weightGain.toFixed(1)}kg</InfoValue>
+            <InfoValue>{totalGain >= 0 ? '+' : ''}{totalGain.toFixed(1)}kg</InfoValue>
           </InfoBox>
           <InfoBox>
-            <InfoLabel>🍼 아기 크기</InfoLabel>
-            <InfoValue $small>{babySize}</InfoValue>
+            <InfoLabel>📅 출산까지</InfoLabel>
+            <InfoValue>{remainingWeeks}주 남음</InfoValue>
           </InfoBox>
         </InfoRow>
 
         <ProgressRow>
-          <ProgressLabel>현재 <strong>{currentWeek}주차</strong></ProgressLabel>
+          <ProgressLabel>현재 <strong>{week}주차</strong></ProgressLabel>
           <ProgressLabel>남은 기간 <strong>{remainingWeeks}주</strong></ProgressLabel>
         </ProgressRow>
         <ProgressBarTrack>
@@ -81,31 +110,32 @@ export default function HomePage({
         onNoSymptom={handleNoSymptom}
       />
 
-      <HealthCard>
-        <HealthTitle>➕ 이번 주 건강 정보</HealthTitle>
+      {weeklyHealth && (
+        <HealthCard>
+          <HealthTitle>➕ 이번 주 건강 정보</HealthTitle>
 
-        <HealthSection>
-          <HealthSectionLabel>권장 체중 증가</HealthSectionLabel>
-          <HealthSectionValue>{recommendedWeightRange}</HealthSectionValue>
-        </HealthSection>
+          <HealthSection>
+            <HealthSectionLabel>권장 체중 증가</HealthSectionLabel>
+            <HealthSectionValue>{weeklyHealth.recommended_weight_gain}</HealthSectionValue>
+          </HealthSection>
 
-        <Divider />
+          <Divider />
 
-        <HealthSectionTitle>관련 증상</HealthSectionTitle>
-        <HealthList>
-          <HealthListItem>갑작스런 수축</HealthListItem>
-          <HealthListItem>양수 터짐 가능</HealthListItem>
-          <HealthListItem>진통</HealthListItem>
-        </HealthList>
+          <HealthSectionTitle>관련 증상</HealthSectionTitle>
+          <HealthList>
+            {weeklyHealth.common_symptoms.map((s, i) => (
+              <HealthListItem key={i}>{s}</HealthListItem>
+            ))}
+          </HealthList>
 
-        <Divider />
+          <Divider />
 
-        <HealthSectionTitle $accent>오늘의 팁</HealthSectionTitle>
-        <HealthList>
-          <HealthListItem>즉시 병원 방문</HealthListItem>
-          <HealthListItem>차분하게 호흡</HealthListItem>
-        </HealthList>
-      </HealthCard>
+          <HealthSectionTitle $accent>오늘의 팁</HealthSectionTitle>
+          <HealthList>
+            <HealthListItem>{weeklyHealth.today_tip}</HealthListItem>
+          </HealthList>
+        </HealthCard>
+      )}
     </Container>
   );
 }
@@ -117,6 +147,12 @@ const Container = styled.div`
   padding: ${({ theme }) => theme.spacing.md};
   padding-bottom: 120px;
   min-height: 100%;
+`;
+const LoadingText = styled.p`
+  ${({ theme }) => theme.typography.body1}
+  color: ${({ theme }) => theme.colors.subtext};
+  text-align: center;
+  margin-top: ${({ theme }) => theme.spacing.xxl};
 `;
 const PregnancyCard = styled.div`
   background: ${({ theme }) => theme.colors.light};
@@ -161,8 +197,8 @@ const InfoLabel = styled.span`
   color: ${({ theme }) => theme.colors.point};
   white-space: nowrap;
 `;
-const InfoValue = styled.span<{ $small?: boolean }>`
-  font-size: ${({ $small }) => $small ? '14px' : '18px'};
+const InfoValue = styled.span`
+  font-size: 18px;
   font-weight: 700;
   color: ${({ theme }) => theme.colors.point};
   white-space: nowrap;
