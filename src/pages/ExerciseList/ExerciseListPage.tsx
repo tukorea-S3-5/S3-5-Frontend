@@ -39,6 +39,11 @@ interface RecommendResponse {
   not_recommend: ExerciseFromAPI[];
 }
 
+interface Guideline {
+  title: string;
+  guidelines: string[];
+}
+
 interface Exercise {
   id: string;
   title: string;
@@ -67,12 +72,17 @@ const ExerciseListPage = () => {
   const [data, setData] = useState<RecommendResponse>({ recommend: [], caution: [], not_recommend: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [guideline, setGuideline] = useState<Guideline | null>(null);
 
   useEffect(() => {
-    getJson<RecommendResponse>(`/recommend?t=${Date.now()}`)
-      .then(json => setData(json))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+    Promise.allSettled([
+      getJson<RecommendResponse>(`/recommend?t=${Date.now()}`),
+      getJson<Guideline>('/pregnancy/guideline'),
+    ]).then(([recommendRes, guidelineRes]) => {
+      if (recommendRes.status === 'fulfilled') setData(recommendRes.value);
+      else setError(true);
+      if (guidelineRes.status === 'fulfilled') setGuideline(guidelineRes.value);
+    }).finally(() => setLoading(false));
   }, []);
 
   const exercisesByTab: Record<TabKey, Exercise[]> = {
@@ -95,10 +105,18 @@ const ExerciseListPage = () => {
     );
   };
 
+  const startSession = async (targetExercises: Exercise[]) => {
+    // record/start가 세션+레코드 모두 생성하므로 session/start는 호출하지 않음
+    const res = await postJson<SessionResponse>('/exercise/record/start', {
+      exercise_ids: targetExercises.map(e => Number(e.id)),
+    });
+    return { session: { ...res.session, records: res.records } };
+  };
+
   const handleStartAll = async () => {
     try {
-      const res = await postJson<SessionResponse>('/exercise/session/start');
-      navigate('/exercise', { state: { exercises, session: { ...res.session, records: res.records } } });
+      const { session } = await startSession(exercises);
+      navigate('/exercise', { state: { exercises, session } });
     } catch {
       navigate('/exercise', { state: { exercises } });
     }
@@ -107,10 +125,8 @@ const ExerciseListPage = () => {
   const handleStartSelected = async () => {
     const selected = exercises.filter(e => selectedExercises.includes(e.id));
     try {
-      const res = await postJson<SessionResponse>('/exercise/record/start', {
-        exercise_ids: selected.map(e => Number(e.id)),
-      });
-      navigate('/exercise', { state: { exercises: selected, session: { ...res.session, records: res.records } } });
+      const { session } = await startSession(selected);
+      navigate('/exercise', { state: { exercises: selected, session } });
     } catch {
       navigate('/exercise', { state: { exercises: selected } });
     }
@@ -124,14 +140,15 @@ const ExerciseListPage = () => {
         <p>운동 시작 전 반드시 담당 의사와 상담하세요. 출혈, 어지러움, 호흡곤란 등의 증상이 나타나면 즉시 중단하세요.</p>
       </Card>
 
-      <Card variant="info" icon="💡" title="3분기 운동 가이드라인 (ACOG)">
-        <ul>
-          <li>운동 강도와 시간을 점진적으로 줄이기</li>
-          <li>낙상 위험이 높은 운동 피하기</li>
-          <li>골반저근 운동(케겔) 지속</li>
-          <li>조기 진통 징후 시 즉시 운동 중단</li>
-        </ul>
-      </Card>
+      {guideline && (
+        <Card variant="info" icon="🏃" title={guideline.title}>
+          <ul>
+            {guideline.guidelines.map((g, i) => (
+              <li key={i}>{g}</li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <TabMenu
         tabs={tabs}

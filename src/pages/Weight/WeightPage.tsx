@@ -136,11 +136,11 @@ export default function WeightPage() {
     .sort((a, b) => a.week - b.week)
     .map(l => ({ week: l.week, weight: l.weight }));
 
-  const totalGain = summary?.total_gain ?? null;
+  const totalGain = summary?.total_gain != null ? summary.total_gain : null;
   const weights = chartData.map(d => d.weight);
   const minW = weights.length ? Math.floor(Math.min(...weights)) - 2 : 40;
   const maxW = weights.length ? Math.ceil(Math.max(...weights)) + 2 : 90;
-  const baseWeight = summary?.start_weight ?? null;
+  const baseWeight = summary?.start_weight != null ? summary.start_weight : null;
 
   // 신규 저장
   const handleSave = async () => {
@@ -208,12 +208,12 @@ export default function WeightPage() {
             <TrendRow>
               <TrendItem>
                 <TrendLabel>최근 4주 평균 증가량</TrendLabel>
-                <TrendValue accent>{trend.slope.toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
+                <TrendValue accent>{(trend.slope ?? 0).toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
               </TrendItem>
               <TrendDivider />
               <TrendItem>
                 <TrendLabel>임신 평균 권장 증가량</TrendLabel>
-                <TrendValue>{trend.expected_slope.toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
+                <TrendValue>{(trend.expected_slope ?? 0).toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
               </TrendItem>
             </TrendRow>
             <TrendStatus statusType={getStatusType(trend.status)}>
@@ -261,16 +261,19 @@ export default function WeightPage() {
           </>
         )}
 
-        {cardState === 'saved' && (
+        {cardState === 'saved' && thisWeekLog ? (
           <SavedRow>
-            <SavedWeight aria-label={`${selectedWeek}주차 체중 ${thisWeekLog?.weight}kg`}>
-              {thisWeekLog?.weight}
+            <SavedWeight aria-label={`${selectedWeek}주차 체중 ${thisWeekLog.weight}kg`}>
+              {thisWeekLog.weight.toFixed(1)}
             </SavedWeight>
             <EditButton onClick={handleEdit} aria-label="체중 수정">
               <Pencil size={16} />
             </EditButton>
           </SavedRow>
-        )}
+        ) : cardState === 'saved' ? (
+          // thisWeekLog 없는데 saved 상태인 경우 방어 처리
+          <>{setCardState('input')}</>
+        ) : null}
 
         {cardState === 'editing' && (
           <>
@@ -313,36 +316,36 @@ export default function WeightPage() {
         </ChartMeta>
 
         <div role="img" aria-label="주차별 체중 변화 그래프 — 빨간선은 실제 측정 체중(kg)">
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0e8e5" />
-            <XAxis
-              dataKey="week"
-              tick={{ fontSize: 10, fill: '#8b7e74' }}
-              tickLine={false}
-              label={{ value: '주차', position: 'insideBottomRight', offset: -4, fontSize: 10, fill: '#8b7e74' }}
-            />
-            <YAxis
-              tick={{ fontSize: 10, fill: '#8b7e74' }}
-              tickLine={false}
-              domain={[minW, maxW]}
-              label={{ value: 'kg', angle: -90, position: 'insideLeft', offset: 16, fontSize: 10, fill: '#8b7e74' }}
-            />
-            <Tooltip
-              formatter={(v) => [`${v}kg`, '체중']}
-              labelFormatter={(l) => `${l}주차`}
-              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #f0e8e5' }}
-            />
-            <Line
-              type="monotone"
-              dataKey="weight"
-              stroke="#ff5038"
-              strokeWidth={2}
-              dot={<Dot r={3} fill="#ff5038" stroke="#ff5038" />}
-              activeDot={{ r: 5 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0e8e5" />
+              <XAxis
+                dataKey="week"
+                tick={{ fontSize: 10, fill: '#8b7e74' }}
+                tickLine={false}
+                label={{ value: '주차', position: 'insideBottomRight', offset: -4, fontSize: 10, fill: '#8b7e74' }}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: '#8b7e74' }}
+                tickLine={false}
+                domain={[minW, maxW]}
+                label={{ value: 'kg', angle: -90, position: 'insideLeft', offset: 16, fontSize: 10, fill: '#8b7e74' }}
+              />
+              <Tooltip
+                formatter={(v) => [`${v}kg`, '체중']}
+                labelFormatter={(l) => `${l}주차`}
+                contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #f0e8e5' }}
+              />
+              <Line
+                type="monotone"
+                dataKey="weight"
+                stroke="#ff5038"
+                strokeWidth={2}
+                dot={<Dot r={3} fill="#ff5038" stroke="#ff5038" />}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </ChartCard>
     </Container>
