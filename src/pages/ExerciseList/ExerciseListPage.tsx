@@ -106,11 +106,11 @@ const ExerciseListPage = () => {
   };
 
   const startSession = async (targetExercises: Exercise[]) => {
-    const sessionRes = await postJson<SessionResponse>('/exercise/session/start');
-    const recordRes = await postJson<SessionResponse>('/exercise/record/start', {
+    // record/start가 세션+레코드 모두 생성하므로 session/start는 호출하지 않음
+    const res = await postJson<SessionResponse>('/exercise/record/start', {
       exercise_ids: targetExercises.map(e => Number(e.id)),
     });
-    return { session: { ...sessionRes.session, records: recordRes.records } };
+    return { session: { ...res.session, records: res.records } };
   };
 
   const handleStartAll = async () => {
