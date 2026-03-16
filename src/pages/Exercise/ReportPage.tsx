@@ -112,10 +112,8 @@ export default function ReportPage() {
     }
   };
 
-  const [saved, setSaved] = useState(false);
   const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    alert('저장 기능은 준비 중이에요!');
   };
 
   if (loading) return <Container><LoadingText>리포트 불러오는 중...</LoadingText></Container>;
@@ -169,7 +167,7 @@ export default function ReportPage() {
 
           {/* 심박수 변화 그래프 */}
           <HeartRateCard>
-            <SectionTitle>💓 심박수 변화</SectionTitle>
+            <SectionTitle>심박수 변화</SectionTitle>
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart
                 data={generateHeartRateData(
@@ -215,8 +213,8 @@ export default function ReportPage() {
 
       <ButtonRow>
         <OutlineButton onClick={handleShare}>🔗 공유하기</OutlineButton>
-        <OutlineButton onClick={handleSave} $saved={saved}>
-          {saved ? '✓ 저장됨' : '🔖 저장됨 (자동)'}
+        <OutlineButton onClick={handleSave}>
+          🔖 저장하기
         </OutlineButton>
       </ButtonRow>
       <HomeButton onClick={handleHome}>홈으로 돌아가기</HomeButton>
@@ -342,13 +340,13 @@ const ButtonRow = styled.div`
   gap: ${({ theme }) => theme.spacing.sm};
   margin-bottom: ${({ theme }) => theme.spacing.sm};
 `;
-const OutlineButton = styled.button<{ $saved?: boolean }>`
+const OutlineButton = styled.button`
   flex: 1;
   height: 52px;
-  background: ${({ $saved, theme }) => $saved ? theme.colors.light : theme.colors.white};
-  border: 1.5px solid ${({ $saved, theme }) => $saved ? theme.colors.point : theme.colors.sub};
+  background: ${({ theme }) => theme.colors.white};
+  border: 1.5px solid ${({ theme }) => theme.colors.sub};
   border-radius: ${({ theme }) => theme.borderRadius.md};
-  color: ${({ $saved, theme }) => $saved ? theme.colors.point : theme.colors.text.primary};
+  color: ${({ theme }) => theme.colors.text.primary};
   ${({ theme }) => theme.typography.button}
   cursor: pointer;
   transition: all 0.2s;
