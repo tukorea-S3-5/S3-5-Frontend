@@ -80,9 +80,9 @@ export default function ExercisePage() {
     window.onYouTubeIframeAPIReady = () => setYtReady(true);
   }, []);
 
-  // 운동 바뀌면 플레이어 생성 후 자동 시작
+  // 운동 바뀌면 플레이어 생성 후 자동 시작 (isConnected 시에만 실행)
   useEffect(() => {
-    if (!ytReady || !playerElRef.current) return;
+    if (!ytReady || !playerElRef.current || !isConnected) return;
     playerRef.current?.destroy();
     setPlayState('idle');
     setElapsed(0);
@@ -130,7 +130,17 @@ export default function ExercisePage() {
     } else {
       if (heartRateRef.current) clearInterval(heartRateRef.current);
       if (playState === 'paused' || playState === 'idle') {
-        setHeartRate(prev => Math.round(prev + (78 - prev) * 0.3)); // 서서히 안정
+        // 점진적으로 안정화 (interval로 반복)
+        heartRateRef.current = setInterval(() => {
+          setHeartRate(prev => {
+            const next = Math.round(prev + (78 - prev) * 0.2);
+            if (Math.abs(next - 78) < 1) {
+              if (heartRateRef.current) clearInterval(heartRateRef.current);
+              return 78;
+            }
+            return next;
+          });
+        }, 1500);
       }
     }
     return () => { if (heartRateRef.current) clearInterval(heartRateRef.current); };

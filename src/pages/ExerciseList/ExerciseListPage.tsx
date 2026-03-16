@@ -106,6 +106,7 @@ const ExerciseListPage = () => {
   };
 
   const startSession = async (targetExercises: Exercise[]) => {
+    if (targetExercises.length === 0) throw new Error('No exercises selected');
     // record/start가 세션+레코드 모두 생성하므로 session/start는 호출하지 않음
     const res = await postJson<SessionResponse>('/exercise/record/start', {
       exercise_ids: targetExercises.map(e => Number(e.id)),

@@ -19,10 +19,11 @@ const Layout: React.FC<LayoutProps> = ({
   const [weekInfo, setWeekInfo] = useState<string | undefined>(undefined);
 
   useEffect(() => {
+    if (!showHeader) return;
     getJson<{ week: number }>('/pregnancy/me')
       .then(res => setWeekInfo(`${res.week}주차`))
       .catch(() => setWeekInfo(undefined));
-  }, []);
+  }, [showHeader]);
 
   return (
     <AppContainer>

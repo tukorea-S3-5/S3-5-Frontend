@@ -131,6 +131,13 @@ export default function WeightPage() {
   };
 
   const thisWeekLog = logs.find(l => l.week === selectedWeek);
+
+  // cardState 'saved'인데 해당 주차 로그 없으면 'input'으로 복구
+  useEffect(() => {
+    if (cardState === 'saved' && !thisWeekLog) {
+      setCardState('input');
+    }
+  }, [cardState, thisWeekLog]);
   const chartData = logs
     .slice()
     .sort((a, b) => a.week - b.week)
@@ -261,7 +268,7 @@ export default function WeightPage() {
           </>
         )}
 
-        {cardState === 'saved' && thisWeekLog ? (
+        {cardState === 'saved' && thisWeekLog && (
           <SavedRow>
             <SavedWeight aria-label={`${selectedWeek}주차 체중 ${thisWeekLog.weight}kg`}>
               {thisWeekLog.weight.toFixed(1)}
@@ -270,10 +277,7 @@ export default function WeightPage() {
               <Pencil size={16} />
             </EditButton>
           </SavedRow>
-        ) : cardState === 'saved' ? (
-          // thisWeekLog 없는데 saved 상태인 경우 방어 처리
-          <>{setCardState('input')}</>
-        ) : null}
+        )}
 
         {cardState === 'editing' && (
           <>

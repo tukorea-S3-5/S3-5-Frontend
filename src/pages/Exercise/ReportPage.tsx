@@ -39,7 +39,7 @@ const generateHeartRateData = (avg: number, max: number) => {
 
 const getComment = (avg: number): string => {
   if (avg >= 130) return '운동 강도가 꽤 높았어요! 다음엔 충분한 휴식을 취하세요. 💪';
-  if (avg >= 115) return '무리한 수준은 아니지만,다음에는 호흡을 조금 더 천천히 해보세요.';
+  if (avg >= 115) return '무리한 수준은 아니지만,\n다음에는 호흡을 조금 더 천천히 해보세요.';
   if (avg >= 100) return '적절한 강도로 운동했어요! 오늘 수고했어요 🌸';
   return '가볍고 안전하게 운동했어요. 꾸준히 하는 게 최고예요! 🤰';
 };
@@ -216,7 +216,7 @@ export default function ReportPage() {
       <ButtonRow>
         <OutlineButton onClick={handleShare}>🔗 공유하기</OutlineButton>
         <OutlineButton onClick={handleSave} $saved={saved}>
-          {saved ? '✓ 저장됨' : '🔖 저장하기'}
+          {saved ? '✓ 저장됨' : '🔖 저장됨 (자동)'}
         </OutlineButton>
       </ButtonRow>
       <HomeButton onClick={handleHome}>홈으로 돌아가기</HomeButton>
