@@ -1,30 +1,34 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import { Outlet } from "react-router-dom";
 import Header from "./Header";
 import BottomNav from "./BottomNav";
+import { getJson } from "../api/http";
 
 interface LayoutProps {
   children?: React.ReactNode;
   showHeader?: boolean;
   showBottomNav?: boolean;
-  weekInfo?: string;
 }
 
 const Layout: React.FC<LayoutProps> = ({
   children,
   showHeader = true,
   showBottomNav = true,
-  weekInfo = "40주차",
 }) => {
+  const [weekInfo, setWeekInfo] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!showHeader) return;
+    getJson<{ week: number }>('/pregnancy/me')
+      .then(res => setWeekInfo(`${res.week}주차`))
+      .catch(() => setWeekInfo(undefined));
+  }, [showHeader]);
+
   return (
     <AppContainer>
       {showHeader && (
-        <Header
-          weekInfo={weekInfo}
-          onNotificationClick={() => console.log("알림")}
-          onSettingsClick={() => console.log("설정")}
-        />
+        <Header weekInfo={weekInfo} />
       )}
 
       <PageContainer $showBottomNav={showBottomNav}>
@@ -44,7 +48,6 @@ const AppContainer = styled.div`
   position: relative;
   box-shadow: ${({ theme }) => theme.shadows.lg};
 
-  /* 모바일 디바이스처럼 보이게 */
   @media (min-width: 481px) {
     border-radius: 0;
   }

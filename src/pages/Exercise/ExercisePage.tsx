@@ -44,13 +44,15 @@ const toVideoId = (url: string) =>
 export default function ExercisePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { exercises, currentHeartRate = 0, session } = (location.state as {
+  const { exercises, session } = (location.state as {
     exercises: Exercise[];
-    currentHeartRate?: number;
     session?: { session_id: number; records: SessionRecord[] };
   }) ?? { exercises: [] };
 
   const [isConnected, setIsConnected] = useState(false);
+  // TODO: IoT 연동 시 실제 심박수로 교체
+  const [heartRate, setHeartRate] = useState(75);
+  const heartRateRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playState, setPlayState] = useState<PlayState>('idle');
   const [duration, setDuration] = useState(0);
@@ -71,16 +73,16 @@ export default function ExercisePage() {
 
   // YouTube IFrame API 로드
   useEffect(() => {
-    if (window.YT) { setYtReady(true); return; }
+    if (window.YT?.Player) { setYtReady(true); return; }
     const tag = document.createElement('script');
     tag.src = 'https://www.youtube.com/iframe_api';
     document.head.appendChild(tag);
     window.onYouTubeIframeAPIReady = () => setYtReady(true);
   }, []);
 
-  // 운동 바뀌면 플레이어 생성 후 자동 시작
+  // 운동 바뀌면 플레이어 생성 후 자동 시작 (isConnected 시에만 실행)
   useEffect(() => {
-    if (!ytReady || !playerElRef.current) return;
+    if (!ytReady || !playerElRef.current || !isConnected) return;
     playerRef.current?.destroy();
     setPlayState('idle');
     setElapsed(0);
@@ -104,7 +106,7 @@ export default function ExercisePage() {
         },
       },
     });
-  }, [ytReady, currentIndex]);
+  }, [ytReady, currentIndex, isConnected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 경과 시간 타이머
   useEffect(() => {
@@ -116,13 +118,49 @@ export default function ExercisePage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [playState]);
 
+  // TODO: IoT 연동 시 제거 - 심박수 시뮬레이션 (운동 중 110~145, 정지 시 70~85)
+  useEffect(() => {
+    if (playState === 'playing') {
+      heartRateRef.current = setInterval(() => {
+        setHeartRate(prev => {
+          const target = 100 + Math.floor(Math.random() * 25); // 100~124 (임산부 권장 범위)
+          return Math.round(prev + (target - prev) * 0.3); // 부드럽게 변화
+        });
+      }, 2000);
+    } else {
+      if (heartRateRef.current) clearInterval(heartRateRef.current);
+      if (playState === 'paused' || playState === 'idle') {
+        // 점진적으로 안정화 (interval로 반복)
+        heartRateRef.current = setInterval(() => {
+          setHeartRate(prev => {
+            const next = Math.round(prev + (78 - prev) * 0.2);
+            if (Math.abs(next - 78) < 1) {
+              if (heartRateRef.current) clearInterval(heartRateRef.current);
+              return 78;
+            }
+            return next;
+          });
+        }, 1500);
+      }
+    }
+    return () => { if (heartRateRef.current) clearInterval(heartRateRef.current); };
+  }, [playState]);
+
   const getActiveRecordId = () => getRecordId(current.id);
 
   // record/end → 다음 운동 또는 완료
   const handleRecordEnd = async (exerciseId: number, onDone: () => void) => {
     const recordId = getRecordId(exerciseId);
+    console.log('[record/end] exerciseId:', exerciseId, '| recordId:', recordId);
     if (recordId) {
-      try { await postJson('/exercise/record/end', { record_id: recordId }); } catch { }
+      try {
+        const res = await postJson('/exercise/record/end', { record_id: recordId });
+        console.log('[record/end] 성공:', res);
+      } catch (e) {
+        console.error('[record/end] 실패:', e);
+      }
+    } else {
+      console.warn('[record/end] recordId 없음 - session.records:', JSON.stringify(session?.records));
     }
     onDone();
   };
@@ -130,8 +168,14 @@ export default function ExercisePage() {
   // record/pause
   const handleRecordPause = async () => {
     const recordId = getActiveRecordId();
+    console.log('[record/pause] recordId:', recordId, '| playState:', playState);
     if (recordId) {
-      try { await postJson('/exercise/record/pause', { record_id: recordId }); } catch { }
+      try {
+        const res = await postJson('/exercise/record/pause', { record_id: recordId });
+        console.log('[record/pause] 성공:', res);
+      } catch (e) {
+        console.error('[record/pause] 실패:', e);
+      }
     }
   };
 
@@ -139,20 +183,30 @@ export default function ExercisePage() {
   const handleRecordResume = async () => {
     const recordId = getActiveRecordId();
     if (recordId) {
-      try { await postJson('/exercise/record/resume', { record_id: recordId }); } catch { }
+      try { await postJson('/exercise/record/resume', { record_id: recordId }); } catch { /* fire-and-forget */ }
     }
   };
 
-  // session/abort
-  const handleSessionAbort = async () => {
-    if (session?.session_id) {
-      try { await postJson('/exercise/session/abort', { session_id: session.session_id }); } catch { }
+  // 중도 종료 - 현재 진행 중인 record/end 호출 → 마지막이면 자동 COMPLETED
+  const handleSessionEnd = async () => {
+    const recordId = getActiveRecordId();
+    console.log('[session/end] 중도종료 | recordId:', recordId, '| session_id:', session?.session_id);
+    if (recordId) {
+      try {
+        const res = await postJson('/exercise/record/end', { record_id: recordId });
+        console.log('[session/end] record/end 성공:', res);
+      } catch (e) {
+        console.error('[session/end] record/end 실패:', e);
+      }
     }
   };
 
   const goNext = () => setCurrentIndex(p => p + 1);
 
-  const finishAll = () => navigate('/report', { state: { exercises, sessionId: session?.session_id } });
+  const finishAll = () => {
+    console.log('[finishAll] sessionId:', session?.session_id);
+    navigate('/report', { state: { exercises, sessionId: session?.session_id } });
+  };
 
   const handleStart = () => {
     playerRef.current?.playVideo();
@@ -182,15 +236,19 @@ export default function ExercisePage() {
   const handleStopAll = () => setStopModal(true);
   const handleStopConfirm = async () => {
     setStopModal(false);
-    await handleSessionAbort();
+    await handleSessionEnd();
     finishAll();
   };
 
   const handleSwitchConfirm = async () => {
     const target = switchModal.targetIndex;
     setSwitchModal({ open: false, targetIndex: 0 });
-    // 현재 운동 pause 처리 후 전환
-    await handleRecordPause();
+    // playing 상태일 때만 pause 처리 (idle이면 record/start 안 됐으므로 스킵)
+    if (playState === 'playing') {
+      playerRef.current?.pauseVideo();
+      setPlayState('paused');
+      await handleRecordPause();
+    }
     setCurrentIndex(target);
   };
 
@@ -208,7 +266,6 @@ export default function ExercisePage() {
         <Container>
           <Header>
             <PageTitle>영상을 보고 따라해보세요!</PageTitle>
-            <StopAllButton onClick={handleStopAll}>운동 종료</StopAllButton>
           </Header>
 
           <VideoBox>
@@ -222,7 +279,7 @@ export default function ExercisePage() {
             </StatCard>
             <StatCard>
               <StatLabel>❤️ 심박수</StatLabel>
-              <StatValue>{currentHeartRate}<StatUnit>bpm</StatUnit></StatValue>
+              <StatValue>{heartRate}<StatUnit>bpm</StatUnit></StatValue>
             </StatCard>
           </StatsRow>
 
@@ -265,6 +322,11 @@ export default function ExercisePage() {
               />
             ))}
           </ListSection>
+
+          <EmergencyStop onClick={handleStopAll}>
+            ⚠️ 몸이 불편하거나 운동을 중단해야 한다면
+            <EmergencyStopLabel>지금 바로 운동 중단하기</EmergencyStopLabel>
+          </EmergencyStop>
 
           {/* 전체 운동 종료 모달 */}
           <Modal isOpen={stopModal} onClose={() => setStopModal(false)} showCloseButton={false}>
@@ -316,14 +378,42 @@ const PageTitle = styled.h1`
 `;
 const StopAllButton = styled.button`
   ${({ theme }) => theme.typography.caption}
-  color: ${({ theme }) => theme.colors.subtext};
-  background: transparent;
-  border: 1px solid ${({ theme }) => theme.colors.sub};
+  font-weight: 600;
+  color: #e53935;
+  background: #fff5f5;
+  border: 1.5px solid #e53935;
   border-radius: ${({ theme }) => theme.borderRadius.full};
   padding: 6px 14px;
   cursor: pointer;
   white-space: nowrap;
-  &:hover { border-color: ${({ theme }) => theme.colors.point}; color: ${({ theme }) => theme.colors.point}; }
+  transition: all 0.2s;
+  &:hover { background: #ffebee; }
+  &:active { transform: scale(0.97); }
+`;
+const EmergencyStop = styled.button`
+  width: 100%;
+  margin-top: ${({ theme }) => theme.spacing.lg};
+  padding: 18px 16px 14px;
+  background: #fff5f5;
+  border: 2px solid #e53935;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  color: #e53935;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  ${({ theme }) => theme.typography.caption}
+  font-weight: 500;
+  transition: all 0.2s;
+  &:hover { background: #ffebee; }
+  &:active { transform: scale(0.98); }
+`;
+const EmergencyStopLabel = styled.span`
+  font-size: 17px;
+  font-weight: 700;
+  color: #e53935;
+  letter-spacing: -0.3px;
 `;
 const VideoBox = styled.div`
   width: 100%;
