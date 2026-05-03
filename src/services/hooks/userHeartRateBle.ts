@@ -39,11 +39,14 @@ export function useHeartRateBle() {
       (bpm) => {
         // 1. 0이면 무조건 미착용 처리 및 버퍼 초기화
         if (bpm === 0) {
+          stabilizingBuffer.current = [];
+          setSensorState("not_worn");
+          setCurrentBpm(0);
+
           // 마지막 정상값이 있으면 유지 (끊김 보정)
           if (lastValidBpm.current > 0) {
             setDisplayBpm(`${lastValidBpm.current}`);
           } else {
-            setSensorState("not_worn");
             setDisplayBpm("센서를 착용해주세요");
           }
           return;
