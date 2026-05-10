@@ -126,10 +126,11 @@ export default function ReportPage() {
           setReport(res);
           setLoading(false);
         }
-      } catch (e: any) {
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
         console.warn(
           `[ReportPage] 실패 (${attempt}/${MAX_RETRY}):`,
-          e?.message,
+          message,
         );
         if (attempt < MAX_RETRY && !cancelled) {
           setTimeout(() => fetchReport(attempt + 1), RETRY_DELAY);
