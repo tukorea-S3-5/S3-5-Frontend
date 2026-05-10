@@ -1,114 +1,318 @@
-import { useLocation, useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
-import MomiCompleted from '@assets/icons/images/MOMI_completed.png';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import styled from "styled-components";
+import MomiCompleted from "@assets/icons/images/MOMI_completed.png";
+import { getJson } from "../../api/http";
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  Area,
+  AreaChart,
+  Line,
+} from "recharts";
 
-interface Exercise {
-  id: number;
-  title: string;
-  videoUrl: string;
+interface ExerciseSummary {
+  exercise_name: string;
+  duration: number | null;
+  avg_heart_rate: number | null;
+  max_heart_rate: number | null;
 }
 
-interface HeartRateDataPoint {
-  time: string;
-  heartRate: number;
+interface ReportResponse {
+  total_duration: number;
+  avg_heart_rate: number | null;
+  max_heart_rate: number | null;
+  status?: "COMPLETED" | "ABORTED" | string;
+  exercises: ExerciseSummary[];
 }
 
-interface ReportState {
-  exercises: Exercise[];
-  totalDuration?: number;
-  avgHeartRate?: number;
-  maxHeartRate?: number;
-  heartRateData?: HeartRateDataPoint[];
-  feedback?: string;
+interface LocationState {
+  sessionId?: number;
+  heartRates?: number[];
 }
+
+// 만약에 llm에 이런 내용 추가한다고 하면 나중에 바꿔야 함
+const getComment = (avg: number | null, status?: string): string => {
+  if (status === "ABORTED") {
+    return "운동을 중간에 종료했지만, 진행한 구간의 기록은 저장되었어요. 몸 상태가 불편했다면 충분히 쉬어주세요.";
+  }
+
+  if (avg === null) {
+    return "심박수 데이터는 부족하지만, 운동 기록은 정상적으로 저장되었어요.";
+  }
+
+  if (avg >= 130) {
+    return "운동 강도가 꽤 높았어요! 다음엔 충분한 휴식을 취하세요. 💪";
+  }
+
+  if (avg >= 115) {
+    return "무리한 수준은 아니지만,\n다음에는 호흡을 조금 더 천천히 해보세요.";
+  }
+
+  if (avg >= 100) {
+    return "적절한 강도로 운동했어요! 오늘 수고했어요 🌸";
+  }
+
+  return "가볍고 안전하게 운동했어요. 꾸준히 하는 게 최고예요! 🤰";
+};
+
+const formatDuration = (seconds: number) => {
+  if (!seconds) return "0분";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m}분 ${s}초` : `${m}분`;
+};
+
+const toChartData = (heartRates: number[], pointCount = 60) => {
+  if (heartRates.length <= pointCount) {
+    return heartRates.map((bpm, index) => ({
+      idx: index,
+      avgBpm: bpm,
+      maxBpm: bpm,
+    }));
+  }
+
+  const chunkSize = Math.ceil(heartRates.length / pointCount);
+
+  return Array.from(
+    { length: Math.ceil(heartRates.length / chunkSize) },
+    (_, i) => {
+      const chunk = heartRates.slice(i * chunkSize, (i + 1) * chunkSize);
+
+      const avg = chunk.reduce((sum, bpm) => sum + bpm, 0) / chunk.length;
+
+      return {
+        idx: i,
+        avgBpm: Math.round(avg),
+        maxBpm: Math.max(...chunk),
+      };
+    },
+  );
+};
 
 export default function ReportPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const {
-    totalDuration = 0,
-    avgHeartRate = 0,
-    maxHeartRate = 0,
-    heartRateData = [],
-    feedback = '',
-  } = (location.state as ReportState) ?? {};
+  const { sessionId, heartRates = [] } =
+    (location.state as LocationState) ?? {};
+
+  const [report, setReport] = useState<ReportResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const MAX_RETRY = 5;
+    const RETRY_DELAY = 1000;
+
+    const fetchReport = async (attempt: number) => {
+      try {
+        console.log(
+          `[ReportPage] GET /report/session/${sessionId} 시도 ${attempt}/${MAX_RETRY}`,
+        );
+        const res = await getJson<ReportResponse>(
+          `/report/session/${sessionId}`,
+        );
+        if (!cancelled) {
+          console.log("[ReportPage] 리포트 성공:", res);
+          setReport(res);
+          setLoading(false);
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        console.warn(
+          `[ReportPage] 실패 (${attempt}/${MAX_RETRY}):`,
+          message,
+        );
+        if (attempt < MAX_RETRY && !cancelled) {
+          setTimeout(() => fetchReport(attempt + 1), RETRY_DELAY);
+        } else if (!cancelled) {
+          setError(true);
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchReport(1);
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  const handleHome = () => navigate("/home");
+
+  const handleShare = () => {
+    if (!report) return;
+    const text = `🤰 오늘의 운동 리포트\n총 운동시간: ${formatDuration(report.total_duration)}\n평균 심박수: ${report.avg_heart_rate ?? "--"}bpm\n#MOMFIT #임산부운동`;
+    if (navigator.share) {
+      navigator.share({ title: "MOMFIT 운동 리포트", text });
+    } else {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => alert("클립보드에 복사되었어요! 📋"));
+    }
+  };
 
   const handleSave = () => {
-    // TODO: 서버에 운동 기록 저장
-    +  alert('저장 기능은 준비 중입니다.');
+    alert("저장 기능은 준비 중이에요!");
   };
 
-  const handleComplete = () => {
-    navigate('/');
-  };
+  const chartData = toChartData(heartRates);
+
+  // 수행한 운동만 필터링
+  const performedExercises =
+    report?.exercises.filter((ex) => (ex.duration ?? 0) > 0) ?? [];
+
+  const isAborted = report?.status === "ABORTED";
+
+  if (loading)
+    return (
+      <Container>
+        <LoadingText>리포트 불러오는 중...</LoadingText>
+      </Container>
+    );
 
   return (
     <Container>
-      <Title>운동을 완료했어요!</Title>
-
+      <Title>{isAborted ? "운동을 중단했어요" : "운동을 완료했어요!"}</Title>
       <CharacterImage src={MomiCompleted} alt="운동 완료" />
 
-      <StatsGrid>
-        <StatCardFull>
-          <StatLabel>🕐 총 운동 시간</StatLabel>
-          <StatValue>{totalDuration}분</StatValue>
-        </StatCardFull>
+      {error || !report ? (
+        <ErrorCard>
+          <ErrorText>리포트를 불러오지 못했어요 😢</ErrorText>
+        </ErrorCard>
+      ) : (
+        <>
+          <StatsGrid>
+            <StatCardFull>
+              <StatLabel>🕐 총 운동 시간</StatLabel>
+              <StatValue>{formatDuration(report.total_duration)}</StatValue>
+            </StatCardFull>
 
-        <StatCard>
-          <StatLabel>❤️ 평균 심박수</StatLabel>
-          <StatValue>{avgHeartRate} <StatUnit>bpm</StatUnit></StatValue>
-        </StatCard>
+            <StatCard>
+              <StatLabel>❤️ 평균 심박수</StatLabel>
+              <StatValue>
+                {report.avg_heart_rate ?? "--"}
+                {report.avg_heart_rate !== null && <StatUnit>bpm</StatUnit>}
+              </StatValue>
+            </StatCard>
 
-        <StatCard>
-          <StatLabel>📈 최고 심박수</StatLabel>
-          <StatValue>{maxHeartRate} <StatUnit>bpm</StatUnit></StatValue>
-        </StatCard>
-      </StatsGrid>
+            <StatCard>
+              <StatLabel>📈 최고 심박수</StatLabel>
+              <StatValue>
+                {report.max_heart_rate ?? "--"}
+                {report.max_heart_rate !== null && <StatUnit>bpm</StatUnit>}
+              </StatValue>
+            </StatCard>
+          </StatsGrid>
 
-      <ChartCard>
-        <ChartTitle>〜 심박수 변화</ChartTitle>
-        <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={heartRateData} margin={{ top: 5, right: 0, left: -20, bottom: 5 }}>
-            <defs>
-              <linearGradient id="hrGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#FF3B30" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#FF3B30" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#FFD4CC" />
-            <XAxis
-              dataKey="time"
-              stroke="#8B7E74"
-              tick={{ fontSize: 10, fill: '#8B7E74' }}
-              interval={Math.max(0, Math.floor(heartRateData.length / 6) - 1)}
-            />
-            <YAxis
-              stroke="#8B7E74"
-              tick={{ fontSize: 10, fill: '#8B7E74' }}
-              domain={[60, 140]}
-              ticks={[60, 80, 100, 120, 140]}
-            />
-            <Area
-              type="monotone"
-              dataKey="heartRate"
-              stroke="#FF3B30"
-              strokeWidth={2}
-              fill="url(#hrGradient)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </ChartCard>
+          {/* 운동별 수행 시간 */}
+          <ExerciseListCard>
+            <SectionTitle>운동별 수행 시간</SectionTitle>
+            {performedExercises.map((ex, i) => (
+              <ExerciseRow key={i}>
+                <ExerciseName>{ex.exercise_name}</ExerciseName>
+                <ExerciseDuration>
+                  {ex.duration != null ? formatDuration(ex.duration) : "-"}
+                </ExerciseDuration>
+              </ExerciseRow>
+            ))}
+          </ExerciseListCard>
 
-      <FeedbackSection>
-        <FeedbackTitle>오늘의 운동 한마디</FeedbackTitle>
-        {feedback && <FeedbackText>{feedback}</FeedbackText>}
-      </FeedbackSection>
+          {/* 심박수 변화 그래프 */}
+          <HeartRateCard>
+            <SectionTitle>심박수 변화</SectionTitle>
+
+            <ChartDescription>
+              센서 수신 간격이 일정하지 않아 전체 데이터를 구간별로 나누고, 평균
+              심박수와 구간 최고 심박수를 함께 표시했어요.
+            </ChartDescription>
+
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 5, right: 8, left: -20, bottom: 5 }}
+                >
+                  <defs>
+                    <linearGradient id="hrGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ff5038" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#ff5038" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0e8e5" />
+                  <XAxis
+                    dataKey="idx"
+                    tick={false}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[60, 160]}
+                    ticks={[60, 80, 100, 120, 140, 160]}
+                    tick={{ fontSize: 10, fill: "#8b7e74" }}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    formatter={(v, name) => [`${v} bpm`, name]}
+                    labelFormatter={(label) => `${Number(label) + 1}번째 구간`}
+                    contentStyle={{
+                      fontSize: 11,
+
+                      borderRadius: 8,
+
+                      border: "1px solid #f0e8e5",
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="avgBpm"
+                    name="평균 심박수"
+                    stroke="#ff5038"
+                    strokeWidth={2}
+                    fill="url(#hrGradient)"
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="maxBpm"
+                    name="구간 최고 심박수"
+                    stroke="#d9362b"
+                    strokeWidth={1.5}
+                    dot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyChartText>심박수 데이터가 없습니다</EmptyChartText>
+            )}
+          </HeartRateCard>
+
+          {/* 오늘의 운동 한마디 */}
+          <CommentCard>
+            <CommentTitle>오늘의 운동 한마디</CommentTitle>
+            <CommentText>
+              {getComment(report.avg_heart_rate, report.status)}
+            </CommentText>
+          </CommentCard>
+        </>
+      )}
 
       <ButtonRow>
-        <OutlineButton onClick={handleSave}>💾 저장하기</OutlineButton>
-        <FillButton onClick={handleComplete}>완료</FillButton>
+        <OutlineButton onClick={handleShare}>🔗 공유하기</OutlineButton>
+        <OutlineButton onClick={handleSave}>🔖 저장하기</OutlineButton>
       </ButtonRow>
+      <HomeButton onClick={handleHome}>홈으로 돌아가기</HomeButton>
     </Container>
   );
 }
@@ -125,28 +329,30 @@ const Container = styled.div`
     ${({ theme }) => theme.colors.white} 100%
   );
 `;
-
+const LoadingText = styled.p`
+  ${({ theme }) => theme.typography.body1}
+  color: ${({ theme }) => theme.colors.subtext};
+  text-align: center;
+  margin-top: ${({ theme }) => theme.spacing.xxl};
+`;
 const Title = styled.h1`
   ${({ theme }) => theme.typography.heading1}
   color: ${({ theme }) => theme.colors.text.primary};
   text-align: center;
   margin: 0 0 ${({ theme }) => theme.spacing.lg} 0;
 `;
-
 const CharacterImage = styled.img`
   width: 200px;
   height: auto;
   margin: 0 auto ${({ theme }) => theme.spacing.lg};
   display: block;
 `;
-
 const StatsGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: ${({ theme }) => theme.spacing.sm};
   margin-bottom: ${({ theme }) => theme.spacing.md};
 `;
-
 const StatCard = styled.div`
   background: ${({ theme }) => theme.colors.white};
   border: 1px solid ${({ theme }) => theme.colors.sub};
@@ -156,18 +362,15 @@ const StatCard = styled.div`
   flex-direction: column;
   gap: 8px;
 `;
-
 const StatCardFull = styled(StatCard)`
   grid-column: 1 / -1;
   align-items: center;
 `;
-
 const StatLabel = styled.p`
   ${({ theme }) => theme.typography.caption}
   color: ${({ theme }) => theme.colors.subtext};
   margin: 0;
 `;
-
 const StatValue = styled.p`
   font-size: 28px;
   font-weight: 700;
@@ -175,13 +378,82 @@ const StatValue = styled.p`
   margin: 0;
   line-height: 1.2;
 `;
-
 const StatUnit = styled.span`
   ${({ theme }) => theme.typography.body2}
   color: ${({ theme }) => theme.colors.subtext};
+  margin-left: 4px;
 `;
-
-const ChartCard = styled.div`
+const ExerciseListCard = styled.div`
+  background: ${({ theme }) => theme.colors.white};
+  border: 1px solid ${({ theme }) => theme.colors.sub};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  padding: ${({ theme }) => theme.spacing.md};
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+const SectionTitle = styled.h3`
+  ${({ theme }) => theme.typography.heading3}
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin: 0 0 4px 0;
+`;
+const ExerciseRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  background: ${({ theme }) => theme.colors.background};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+`;
+const ExerciseName = styled.span`
+  ${({ theme }) => theme.typography.body2}
+  color: ${({ theme }) => theme.colors.text.primary};
+`;
+const ExerciseDuration = styled.span`
+  ${({ theme }) => theme.typography.body2}
+  font-weight: 700;
+  color: ${({ theme }) => theme.colors.point};
+`;
+const ErrorCard = styled.div`
+  background: ${({ theme }) => theme.colors.white};
+  border: 1px solid ${({ theme }) => theme.colors.sub};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  padding: ${({ theme }) => theme.spacing.xl};
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+const ErrorText = styled.p`
+  ${({ theme }) => theme.typography.body1}
+  color: ${({ theme }) => theme.colors.subtext};
+  margin: 0;
+`;
+const ButtonRow = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.sm};
+  margin-bottom: ${({ theme }) => theme.spacing.sm};
+`;
+const OutlineButton = styled.button`
+  flex: 1;
+  height: 52px;
+  background: ${({ theme }) => theme.colors.white};
+  border: 1.5px solid ${({ theme }) => theme.colors.sub};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  color: ${({ theme }) => theme.colors.text.primary};
+  ${({ theme }) => theme.typography.button}
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.point};
+    color: ${({ theme }) => theme.colors.point};
+  }
+  &:active {
+    transform: scale(0.98);
+  }
+`;
+const HeartRateCard = styled.div`
   background: ${({ theme }) => theme.colors.white};
   border: 1px solid ${({ theme }) => theme.colors.sub};
   border-radius: ${({ theme }) => theme.borderRadius.lg};
@@ -189,50 +461,39 @@ const ChartCard = styled.div`
   margin-bottom: ${({ theme }) => theme.spacing.md};
 `;
 
-const ChartTitle = styled.h3`
-  ${({ theme }) => theme.typography.heading3}
-  color: ${({ theme }) => theme.colors.text.primary};
-  margin: 0 0 ${({ theme }) => theme.spacing.md} 0;
+const ChartDescription = styled.p`
+  ${({ theme }) => theme.typography.caption}
+  color: ${({ theme }) => theme.colors.subtext};
+  margin: 0 0 ${({ theme }) => theme.spacing.sm} 0;
 `;
 
-const FeedbackSection = styled.div`
-  margin-bottom: ${({ theme }) => theme.spacing.lg};
+const EmptyChartText = styled.div`
+  ${({ theme }) => theme.typography.body2}
+  color: ${({ theme }) => theme.colors.subtext};
+  text-align: center;
+  padding: 20px;
 `;
 
-const FeedbackTitle = styled.h2`
+const CommentCard = styled.div`
+  background: ${({ theme }) => theme.colors.light};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  padding: ${({ theme }) => theme.spacing.lg};
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+`;
+const CommentTitle = styled.h3`
   ${({ theme }) => theme.typography.heading3}
   color: ${({ theme }) => theme.colors.text.primary};
   margin: 0 0 ${({ theme }) => theme.spacing.sm} 0;
 `;
-
-const FeedbackText = styled.p`
-  ${({ theme }) => theme.typography.body1}
-  color: ${({ theme }) => theme.colors.text.primary};
-  white-space: pre-line;
+const CommentText = styled.p`
+  ${({ theme }) => theme.typography.body2}
+  color: ${({ theme }) => theme.colors.subtext};
   margin: 0;
+  white-space: pre-line;
+  line-height: 1.6;
 `;
-
-const ButtonRow = styled.div`
-  display: flex;
-  gap: ${({ theme }) => theme.spacing.sm};
-`;
-
-const OutlineButton = styled.button`
-  flex: 1;
-  height: 56px;
-  background: ${({ theme }) => theme.colors.white};
-  border: 2px solid ${({ theme }) => theme.colors.point};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  color: ${({ theme }) => theme.colors.point};
-  ${({ theme }) => theme.typography.button}
-  cursor: pointer;
-  transition: all 0.2s;
-  &:hover { background: ${({ theme }) => theme.colors.light}; }
-  &:active { transform: scale(0.98); }
-`;
-
-const FillButton = styled.button`
-  flex: 1;
+const HomeButton = styled.button`
+  width: 100%;
   height: 56px;
   background: ${({ theme }) => theme.colors.point};
   border: none;
@@ -241,6 +502,10 @@ const FillButton = styled.button`
   ${({ theme }) => theme.typography.button}
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { filter: brightness(0.92); }
-  &:active { transform: scale(0.98); }
+  &:hover {
+    filter: brightness(0.92);
+  }
+  &:active {
+    transform: scale(0.98);
+  }
 `;
