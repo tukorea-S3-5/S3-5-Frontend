@@ -88,6 +88,10 @@ class HeartRateBLEService {
     const decoder = new TextDecoder("utf-8");
     const bpmString = decoder.decode(value);
     const bpm = parseInt(bpmString, 10);
+    if (Number.isNaN(bpm)) {
+      console.warn("유효하지 않은 심박수 payload:", bpmString);
+      return;
+    }
 
     if (this.onHeartRateChangeCallback) this.onHeartRateChangeCallback(bpm);
   };

@@ -79,8 +79,12 @@ export default function ExercisePage() {
     pauseExerciseMode,
     resumeExerciseMode,
     stopExerciseMode,
-    getHeartRateSamples,
+    getHeartRates,
+    getSessionHeartRates,
+    resetSessionHeartRates,
   } = useHeartRateBle();
+
+  const allowNavigationRef = useRef(false);
 
   // 현재 몇 번째 운동을 진행 중인지 나타내는 인덱스
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -95,8 +99,14 @@ export default function ExercisePage() {
   // YouTube IFrame API가 로드되었는지 여부
   const [ytReady, setYtReady] = useState(false);
 
+  // 종료된 운동 저장
+  const [endedExerciseIds, setEndedExerciseIds] = useState<number[]>([]);
+
   // 전체 운동 종료 확인 모달 상태
   const [stopModal, setStopModal] = useState(false);
+
+  // 운동 페이지에서 떠난다면 운동 중단 안내 모달
+  const [leaveModal, setLeaveModal] = useState(false);
 
   // 운동 목록에서 다른 운동을 눌렀을 때 전환 확인 모달 상태
   const [switchModal, setSwitchModal] = useState<{
@@ -123,9 +133,6 @@ export default function ExercisePage() {
 
   // 현재 화면에서 재생할 운동 정보
   const current = exercises[currentIndex];
-
-  // 마지막 운동인지 여부
-  const isLast = currentIndex === exercises.length - 1;
 
   // 현재 운동의 exercise_id에 해당하는 record_id 탐색
   // 백엔드 record API는 exercise_id가 아니라 record_id를 기준으로 동작
@@ -154,6 +161,11 @@ export default function ExercisePage() {
 
     window.onYouTubeIframeAPIReady = () => setYtReady(true);
   }, []);
+
+  // 새 운동 세션에 진입하면 전체 세션 심박 배열 초기화
+  useEffect(() => {
+    resetSessionHeartRates();
+  }, [resetSessionHeartRates]);
 
   // 사용자별 최대 허용 심박수 조회
   // 운동 중 currentBpm이 이 값을 넘으면 ESP32로 진동 명령 전송
@@ -194,13 +206,16 @@ export default function ExercisePage() {
             stopExerciseMode();
 
             handleRecordEnd(current.id, () => {
-              isLast ? finishAll() : goNext();
+              hasNextAvailableExercise ? goNext(current.id) : finishAll();
             });
           }
         },
       },
     });
-  }, [ytReady, currentIndex, isConnected, current, isLast, stopExerciseMode]);
+    // YouTube Player 생성 effect는 player 재생성 타이밍을 제한하기 위해
+    // 일부 핸들러 함수를 dependency에서 제외한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ytReady, currentIndex, isConnected, current, stopExerciseMode]);
 
   // 영상이 playing 상태일 때만 1초마다 경과 시간 증가
   // paused/idle 상태에서는 타이머 정지
@@ -235,6 +250,40 @@ export default function ExercisePage() {
     });
   }, [currentBpm, maxAllowedBpm, playState, vibrate]);
 
+  // 페이지 이탈 취소
+  const handleLeaveCancel = () => {
+    setLeaveModal(false);
+  };
+
+  // 운동 페이지를 나가겠다고 확정하면 세션을 중단 처리한 뒤 홈으로 이동
+  const handleLeaveConfirm = async () => {
+    stopExerciseMode();
+    playerRef.current?.pauseVideo();
+    setLeaveModal(false);
+
+    const success = await handleSessionEnd();
+    if (!success) return;
+
+    allowNavigationRef.current = true;
+    navigate("/home");
+  };
+
+  // 페이지 새로고침 혹은 탭 닫기 시 경고 문구
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!session?.session_id) return;
+      if (allowNavigationRef.current) return;
+
+      event.preventDefault();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [session?.session_id]);
+
   // 현재 진행 중인 운동의 record_id를 가져오는 helper
   const getActiveRecordId = () => getRecordId(current.id);
 
@@ -253,8 +302,18 @@ export default function ExercisePage() {
       try {
         const res = await postJson("/exercise/record/end", {
           record_id: recordId,
+          heart_rates: getHeartRates(),
         });
+
         console.log("[record/end] 성공:", res);
+
+        setEndedExerciseIds((prev) =>
+          prev.includes(Number(exerciseId))
+            ? prev
+            : [...prev, Number(exerciseId)],
+        );
+
+        onDone();
       } catch (e) {
         console.error("[record/end] 실패:", e);
       }
@@ -264,9 +323,6 @@ export default function ExercisePage() {
         JSON.stringify(session?.records),
       );
     }
-
-    console.log("[heart-rate samples]", getHeartRateSamples());
-    onDone();
   };
 
   // 현재 운동 record를 일시정지 상태로 변경
@@ -295,52 +351,100 @@ export default function ExercisePage() {
   const handleRecordResume = async () => {
     const recordId = getActiveRecordId();
 
-    if (recordId) {
-      try {
-        await postJson("/exercise/record/resume", { record_id: recordId });
-      } catch (e) {
-        console.error("[record/resume] 실패:", e);
-      }
+    if (!recordId) return false;
+
+    try {
+      const res = await postJson("/exercise/record/resume", {
+        record_id: recordId,
+      });
+
+      console.log("[record/resume] 성공:", res);
+      return true;
+    } catch (e) {
+      console.error("[record/resume] 실패:", e);
+      return false;
     }
   };
 
   // 전체 운동을 중도 종료할 때 현재 진행 중인 record만 종료
   // 이후 리포트 화면으로 이동
   const handleSessionEnd = async () => {
-    const recordId = getActiveRecordId();
-    console.log(
-      "[session/end] 중도종료 | recordId:",
-      recordId,
-      "| session_id:",
-      session?.session_id,
-    );
+    console.log("[session/abort] 중도종료 | session_id:", session?.session_id);
 
-    if (recordId) {
-      try {
-        const res = await postJson("/exercise/record/end", {
-          record_id: recordId,
-        });
-        console.log("[session/end] record/end 성공:", res);
-      } catch (e) {
-        console.error("[session/end] record/end 실패:", e);
-      }
+    if (!session?.session_id) {
+      console.warn("[session/abort] session_id 없음");
+      return false;
+    }
+
+    try {
+      const res = await postJson("/exercise/session/abort", {
+        session_id: session.session_id,
+        heart_rates: getHeartRates(),
+      });
+      console.log("[session/abort] 성공:", res);
+      return true;
+    } catch (e) {
+      console.error("[session/abort] 실패:", e);
+      return false;
     }
   };
 
   // 다음 운동으로 이동
-  const goNext = () => setCurrentIndex((p) => p + 1);
+  const goNext = (justEndedExerciseId?: number) => {
+    const endedSet = new Set(endedExerciseIds);
+
+    if (justEndedExerciseId) {
+      endedSet.add(justEndedExerciseId);
+    }
+
+    // 현재 운동 다음부터 탐색
+    for (let i = currentIndex + 1; i < exercises.length; i++) {
+      if (!endedSet.has(Number(exercises[i].id))) {
+        setCurrentIndex(i);
+        return;
+      }
+    }
+
+    // 뒤에 없으면 앞쪽 탐색
+    for (let i = 0; i < currentIndex; i++) {
+      if (!endedSet.has(Number(exercises[i].id))) {
+        setCurrentIndex(i);
+        return;
+      }
+    }
+
+    // 남은 운동 없음
+
+    finishAll();
+  };
+
+  // 남은 운동이 있는지 확인
+  const hasNextAvailableExercise = exercises.some(
+    (ex) =>
+      Number(ex.id) !== Number(current?.id) &&
+      !endedExerciseIds.includes(Number(ex.id)),
+  );
 
   // 모든 운동이 끝났거나 중도 종료했을 때 리포트 화면으로 이동
   const finishAll = () => {
     console.log("[finishAll] sessionId:", session?.session_id);
+    allowNavigationRef.current = true;
+
     navigate("/report", {
-      state: { exercises, sessionId: session?.session_id },
+      state: {
+        exercises,
+        sessionId: session?.session_id,
+        heartRates: getSessionHeartRates(),
+      },
     });
   };
 
   // 시작 버튼 클릭 시 실행
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!isConnected) return;
+
+    const success = await handleRecordResume();
+    if (!success) return;
 
     playerRef.current?.playVideo();
     setPlayState("playing");
@@ -359,10 +463,12 @@ export default function ExercisePage() {
   // 재개 버튼 클릭 시 실행
   // 영상과 record를 재개하고 기존 심박 배열에 이어서 저장
   const handleResume = async () => {
+    const success = await handleRecordResume();
+    if (!success) return;
+
     playerRef.current?.playVideo();
     setPlayState("playing");
     resumeExerciseMode();
-    await handleRecordResume();
   };
 
   // 현재 운동을 완료하고 다음 운동 또는 리포트로 이동
@@ -371,7 +477,7 @@ export default function ExercisePage() {
     playerRef.current?.pauseVideo();
 
     handleRecordEnd(current.id, () => {
-      isLast ? finishAll() : goNext();
+      hasNextAvailableExercise ? goNext(current.id) : finishAll();
     });
   };
 
@@ -383,21 +489,28 @@ export default function ExercisePage() {
   const handleStopConfirm = async () => {
     stopExerciseMode();
     setStopModal(false);
-    await handleSessionEnd();
+
+    const success = await handleSessionEnd();
+    if (!success) return;
+
     finishAll();
   };
 
   // 운동 목록에서 다른 운동으로 이동하기를 확정했을 때 실행
-  // 현재 운동 중이면 pause 처리 후 선택한 운동으로 전환
+  // 현재 운동 중이면 종료(end) 처리 후 선택한 운동으로 전환
   const handleSwitchConfirm = async () => {
     const target = switchModal.targetIndex;
     setSwitchModal({ open: false, targetIndex: 0 });
 
-    if (playState === "playing") {
+    if (playState === "playing" || playState === "paused") {
+      stopExerciseMode();
       playerRef.current?.pauseVideo();
-      setPlayState("paused");
-      pauseExerciseMode();
-      await handleRecordPause();
+
+      await handleRecordEnd(current.id, () => {
+        setCurrentIndex(target);
+      });
+
+      return;
     }
 
     setCurrentIndex(target);
@@ -483,7 +596,7 @@ export default function ExercisePage() {
                   일시정지
                 </ActionButton>
                 <ActionButton $variant="danger" onClick={handleCurrentEnd}>
-                  {isLast ? "운동 완료" : "다음 운동"}
+                  {hasNextAvailableExercise ? "다음 운동" : "운동 종료"}
                 </ActionButton>
               </>
             )}
@@ -492,7 +605,7 @@ export default function ExercisePage() {
               <>
                 <ActionButton onClick={handleResume}>▷ 재개하기</ActionButton>
                 <ActionButton $variant="danger" onClick={handleCurrentEnd}>
-                  {isLast ? "운동 완료" : "다음 운동"}
+                  {hasNextAvailableExercise ? "다음 운동" : "운동 종료"}
                 </ActionButton>
               </>
             )}
@@ -501,18 +614,27 @@ export default function ExercisePage() {
           {/* 전체 운동 목록 */}
           <ListSection>
             <ListTitle>운동 목록</ListTitle>
-            {exercises.map((ex, idx) => (
-              <ExerciseListItem
-                key={ex.id}
-                index={idx + 1}
-                title={ex.title}
-                isActive={idx === currentIndex}
-                onClick={() =>
-                  idx !== currentIndex &&
-                  setSwitchModal({ open: true, targetIndex: idx })
-                }
-              />
-            ))}
+            {exercises.map((ex, idx) => {
+              const exerciseId = Number(ex.id);
+              const isEnded = endedExerciseIds.includes(exerciseId);
+
+              return (
+                <ExerciseItemWrapper key={ex.id} $isEnded={isEnded}>
+                  <ExerciseListItem
+                    index={idx + 1}
+                    title={isEnded ? `${ex.title} 완료` : ex.title}
+                    isActive={idx === currentIndex}
+                    onClick={() => {
+                      if (isEnded) return;
+
+                      if (idx !== currentIndex) {
+                        setSwitchModal({ open: true, targetIndex: idx });
+                      }
+                    }}
+                  />
+                </ExerciseItemWrapper>
+              );
+            })}
           </ListSection>
 
           <Modal
@@ -545,10 +667,12 @@ export default function ExercisePage() {
             <ModalBody>
               <ModalTitle>다른 운동으로 이동할까요?</ModalTitle>
               <ModalDesc>
-                현재 <strong>{current.title}</strong>을 중단하고
+                현재 <strong>{current.title}</strong>을 종료하고
                 <br />
                 <strong>{exercises[switchModal.targetIndex]?.title}</strong>으로
-                이동합니다
+                이동합니다.
+                <br />
+                종료된 운동은 다시 실행할 수 없어요.
               </ModalDesc>
               <ModalButtons>
                 <ModalOutlineBtn
@@ -560,6 +684,29 @@ export default function ExercisePage() {
                 </ModalOutlineBtn>
                 <ModalFillBtn onClick={handleSwitchConfirm}>
                   {exercises[switchModal.targetIndex]?.title} 시작
+                </ModalFillBtn>
+              </ModalButtons>
+            </ModalBody>
+          </Modal>
+
+          <Modal
+            isOpen={leaveModal}
+            onClose={handleLeaveCancel}
+            showCloseButton={false}
+          >
+            <ModalBody>
+              <ModalEmoji>⚠️</ModalEmoji>
+              <ModalTitle>운동을 종료하고 나가시겠어요?</ModalTitle>
+              <ModalDesc>
+                현재 운동 기록이 중단 처리됩니다.{"\n"}
+                이동 후에는 이 운동 세션을 이어서 진행할 수 없어요.
+              </ModalDesc>
+              <ModalButtons>
+                <ModalOutlineBtn onClick={handleLeaveCancel}>
+                  계속 운동하기
+                </ModalOutlineBtn>
+                <ModalFillBtn onClick={handleLeaveConfirm}>
+                  종료하고 나가기
                 </ModalFillBtn>
               </ModalButtons>
             </ModalBody>
@@ -801,4 +948,13 @@ const ModalFillBtn = styled.button`
   &:hover {
     filter: brightness(0.92);
   }
+`;
+
+const ExerciseItemWrapper = styled.div<{ $isEnded: boolean }>`
+  opacity: ${({ $isEnded }) => ($isEnded ? 0.45 : 1)};
+  filter: ${({ $isEnded }) => ($isEnded ? "grayscale(0.4)" : "none")};
+  pointer-events: ${({ $isEnded }) => ($isEnded ? "none" : "auto")};
+  transition:
+    opacity 0.2s ease,
+    filter 0.2s ease;
 `;
