@@ -26,7 +26,7 @@ const Header: React.FC<HeaderProps> = ({
       {weekInfo && <WeekInfo>{weekInfo}</WeekInfo>}
 
       <Icons>
-        <IconButton onClick={() => navigate('/mypage')} aria-label="마이페이지">
+        <IconButton onClick={() => navigate('/profile')} aria-label="마이페이지">
           👤
         </IconButton>
       </Icons>

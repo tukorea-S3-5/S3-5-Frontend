@@ -35,10 +35,10 @@ interface WeightResponse {
 }
 
 interface WeightTrend {
-  based_on: string;
-  slope: number;
-  expected_slope: number;
-  status: string;
+  based_on?: string;
+  slope?: number;
+  expected_slope?: number;
+  status?: string;
 }
 
 interface PregnancyInfo {
@@ -47,9 +47,13 @@ interface PregnancyInfo {
 
 type StatusType = 'normal' | 'excessive' | 'warning';
 
-const getStatusType = (status: string): StatusType => {
+const getStatusType = (status?: string): StatusType => {
+  if (!status) return 'warning';
+
   if (status === '정상 증가 추세') return 'normal';
+
   if (status.includes('과도')) return 'excessive';
+
   return 'warning';
 };
 
@@ -85,21 +89,56 @@ export default function WeightPage() {
   const fetchWeight = async (week?: number) => {
     try {
       const [weightRes, trendRes] = await Promise.allSettled([
-        getJson<WeightResponse>('/pregnancy/weight'),
-        getJson<WeightTrend>('/pregnancy/weight-trend'),
+        getJson<any>('/pregnancy/weight'),
+        getJson<any>('/pregnancy/weight-trend'),
       ]);
+
       if (weightRes.status === 'fulfilled') {
-        setSummary(weightRes.value.summary);
-        setLogs(weightRes.value.logs);
+        const data = weightRes.value;
+
+        const mappedSummary: WeightSummary = {
+          start_weight: data?.summary?.start_weight ?? 0,
+          current_weight: data?.summary?.current_weight ?? 0,
+          total_gain: data?.summary?.total_gain ?? 0,
+        };
+
+        const mappedLogs: WeightLog[] = (data?.logs ?? []).map((log: any) => ({
+          weight_log_id: log.weight_log_id,
+          pregnancy_id: log.pregnancy_id,
+          week: log.week,
+          weight: log.weight,
+          created_at: log.created_at,
+        }));
+
+        setSummary(mappedSummary);
+        setLogs(mappedLogs);
+
         const targetWeek = week ?? selectedWeek;
-        const log = weightRes.value.logs.find(l => l.week === targetWeek);
+
+        const log = mappedLogs.find(l => l.week === targetWeek);
+
         setCardState(log ? 'saved' : 'input');
       } else {
         setError('데이터를 불러오지 못했어요. 다시 시도해주세요.');
       }
+
       if (trendRes.status === 'fulfilled') {
-        setTrend(trendRes.value);
+        const trendData = trendRes.value;
+
+        const mappedTrend: WeightTrend = {
+          based_on: trendData?.based_on ?? '',
+          slope: trendData?.slope ?? 0,
+          expected_slope: trendData?.expected_slope ?? 0,
+          status: trendData?.status ?? '',
+        };
+
+        console.log('[trend response]', mappedTrend);
+
+        setTrend(mappedTrend);
       }
+    } catch (e) {
+      console.error(e);
+      setError('데이터를 불러오는 중 오류가 발생했어요.');
     } finally {
       setLoading(false);
     }
@@ -211,7 +250,7 @@ export default function WeightPage() {
           </GainValue>
         </GainRow>
         {trend && (
-          <TrendCard statusType={getStatusType(trend.status)}>
+          <TrendCard statusType={getStatusType(trend?.status)}>
             <TrendRow>
               <TrendItem>
                 <TrendLabel>최근 4주 평균 증가량</TrendLabel>
@@ -223,8 +262,8 @@ export default function WeightPage() {
                 <TrendValue>{(trend.expected_slope ?? 0).toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
               </TrendItem>
             </TrendRow>
-            <TrendStatus statusType={getStatusType(trend.status)}>
-              👉 {trend.status}
+            <TrendStatus statusType={getStatusType(trend?.status)}>
+              {trend.status || '상태 정보를 불러오는 중입니다.'}
             </TrendStatus>
           </TrendCard>
         )}
