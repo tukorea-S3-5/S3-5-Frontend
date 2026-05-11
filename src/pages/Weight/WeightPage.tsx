@@ -35,10 +35,10 @@ interface WeightResponse {
 }
 
 interface WeightTrend {
-  based_on: string;
-  slope: number;
-  expected_slope: number;
-  status: string;
+  based_on?: string;
+  slope?: number;
+  expected_slope?: number;
+  status?: string;
 }
 
 interface PregnancyInfo {
@@ -47,9 +47,13 @@ interface PregnancyInfo {
 
 type StatusType = 'normal' | 'excessive' | 'warning';
 
-const getStatusType = (status: string): StatusType => {
+const getStatusType = (status?: string): StatusType => {
+  if (!status) return 'warning';
+
   if (status === '정상 증가 추세') return 'normal';
+
   if (status.includes('과도')) return 'excessive';
+
   return 'warning';
 };
 
@@ -85,21 +89,56 @@ export default function WeightPage() {
   const fetchWeight = async (week?: number) => {
     try {
       const [weightRes, trendRes] = await Promise.allSettled([
-        getJson<WeightResponse>('/pregnancy/weight'),
-        getJson<WeightTrend>('/pregnancy/weight-trend'),
+        getJson<any>('/pregnancy/weight'),
+        getJson<any>('/pregnancy/weight-trend'),
       ]);
+
       if (weightRes.status === 'fulfilled') {
-        setSummary(weightRes.value.summary);
-        setLogs(weightRes.value.logs);
+        const data = weightRes.value;
+
+        const mappedSummary: WeightSummary = {
+          start_weight: data?.summary?.start_weight ?? 0,
+          current_weight: data?.summary?.current_weight ?? 0,
+          total_gain: data?.summary?.total_gain ?? 0,
+        };
+
+        const mappedLogs: WeightLog[] = (data?.logs ?? []).map((log: any) => ({
+          weight_log_id: log.weight_log_id,
+          pregnancy_id: log.pregnancy_id,
+          week: log.week,
+          weight: log.weight,
+          created_at: log.created_at,
+        }));
+
+        setSummary(mappedSummary);
+        setLogs(mappedLogs);
+
         const targetWeek = week ?? selectedWeek;
-        const log = weightRes.value.logs.find(l => l.week === targetWeek);
+
+        const log = mappedLogs.find(l => l.week === targetWeek);
+
         setCardState(log ? 'saved' : 'input');
       } else {
         setError('데이터를 불러오지 못했어요. 다시 시도해주세요.');
       }
+
       if (trendRes.status === 'fulfilled') {
-        setTrend(trendRes.value);
+        const trendData = trendRes.value;
+
+        const mappedTrend: WeightTrend = {
+          based_on: trendData?.based_on ?? '',
+          slope: trendData?.slope ?? 0,
+          expected_slope: trendData?.expected_slope ?? 0,
+          status: trendData?.status ?? '',
+        };
+
+        console.log('[trend response]', mappedTrend);
+
+        setTrend(mappedTrend);
       }
+    } catch (e) {
+      console.error(e);
+      setError('데이터를 불러오는 중 오류가 발생했어요.');
     } finally {
       setLoading(false);
     }
@@ -131,16 +170,23 @@ export default function WeightPage() {
   };
 
   const thisWeekLog = logs.find(l => l.week === selectedWeek);
+
+  // cardState 'saved'인데 해당 주차 로그 없으면 'input'으로 복구
+  useEffect(() => {
+    if (cardState === 'saved' && !thisWeekLog) {
+      setCardState('input');
+    }
+  }, [cardState, thisWeekLog]);
   const chartData = logs
     .slice()
     .sort((a, b) => a.week - b.week)
     .map(l => ({ week: l.week, weight: l.weight }));
 
-  const totalGain = summary?.total_gain ?? null;
+  const totalGain = summary?.total_gain != null ? summary.total_gain : null;
   const weights = chartData.map(d => d.weight);
   const minW = weights.length ? Math.floor(Math.min(...weights)) - 2 : 40;
   const maxW = weights.length ? Math.ceil(Math.max(...weights)) + 2 : 90;
-  const baseWeight = summary?.start_weight ?? null;
+  const baseWeight = summary?.start_weight != null ? summary.start_weight : null;
 
   // 신규 저장
   const handleSave = async () => {
@@ -204,20 +250,20 @@ export default function WeightPage() {
           </GainValue>
         </GainRow>
         {trend && (
-          <TrendCard statusType={getStatusType(trend.status)}>
+          <TrendCard statusType={getStatusType(trend?.status)}>
             <TrendRow>
               <TrendItem>
                 <TrendLabel>최근 4주 평균 증가량</TrendLabel>
-                <TrendValue accent>{trend.slope.toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
+                <TrendValue accent>{(trend.slope ?? 0).toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
               </TrendItem>
               <TrendDivider />
               <TrendItem>
                 <TrendLabel>임신 평균 권장 증가량</TrendLabel>
-                <TrendValue>{trend.expected_slope.toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
+                <TrendValue>{(trend.expected_slope ?? 0).toFixed(2)}kg<TrendUnit>/주</TrendUnit></TrendValue>
               </TrendItem>
             </TrendRow>
-            <TrendStatus statusType={getStatusType(trend.status)}>
-              👉 {trend.status}
+            <TrendStatus statusType={getStatusType(trend?.status)}>
+              {trend.status || '상태 정보를 불러오는 중입니다.'}
             </TrendStatus>
           </TrendCard>
         )}
@@ -261,10 +307,10 @@ export default function WeightPage() {
           </>
         )}
 
-        {cardState === 'saved' && (
+        {cardState === 'saved' && thisWeekLog && (
           <SavedRow>
-            <SavedWeight aria-label={`${selectedWeek}주차 체중 ${thisWeekLog?.weight}kg`}>
-              {thisWeekLog?.weight}
+            <SavedWeight aria-label={`${selectedWeek}주차 체중 ${thisWeekLog.weight}kg`}>
+              {thisWeekLog.weight.toFixed(1)}
             </SavedWeight>
             <EditButton onClick={handleEdit} aria-label="체중 수정">
               <Pencil size={16} />
@@ -313,36 +359,36 @@ export default function WeightPage() {
         </ChartMeta>
 
         <div role="img" aria-label="주차별 체중 변화 그래프 — 빨간선은 실제 측정 체중(kg)">
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0e8e5" />
-            <XAxis
-              dataKey="week"
-              tick={{ fontSize: 10, fill: '#8b7e74' }}
-              tickLine={false}
-              label={{ value: '주차', position: 'insideBottomRight', offset: -4, fontSize: 10, fill: '#8b7e74' }}
-            />
-            <YAxis
-              tick={{ fontSize: 10, fill: '#8b7e74' }}
-              tickLine={false}
-              domain={[minW, maxW]}
-              label={{ value: 'kg', angle: -90, position: 'insideLeft', offset: 16, fontSize: 10, fill: '#8b7e74' }}
-            />
-            <Tooltip
-              formatter={(v) => [`${v}kg`, '체중']}
-              labelFormatter={(l) => `${l}주차`}
-              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #f0e8e5' }}
-            />
-            <Line
-              type="monotone"
-              dataKey="weight"
-              stroke="#ff5038"
-              strokeWidth={2}
-              dot={<Dot r={3} fill="#ff5038" stroke="#ff5038" />}
-              activeDot={{ r: 5 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0e8e5" />
+              <XAxis
+                dataKey="week"
+                tick={{ fontSize: 10, fill: '#8b7e74' }}
+                tickLine={false}
+                label={{ value: '주차', position: 'insideBottomRight', offset: -4, fontSize: 10, fill: '#8b7e74' }}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: '#8b7e74' }}
+                tickLine={false}
+                domain={[minW, maxW]}
+                label={{ value: 'kg', angle: -90, position: 'insideLeft', offset: 16, fontSize: 10, fill: '#8b7e74' }}
+              />
+              <Tooltip
+                formatter={(v) => [`${v}kg`, '체중']}
+                labelFormatter={(l) => `${l}주차`}
+                contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #f0e8e5' }}
+              />
+              <Line
+                type="monotone"
+                dataKey="weight"
+                stroke="#ff5038"
+                strokeWidth={2}
+                dot={<Dot r={3} fill="#ff5038" stroke="#ff5038" />}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </ChartCard>
     </Container>

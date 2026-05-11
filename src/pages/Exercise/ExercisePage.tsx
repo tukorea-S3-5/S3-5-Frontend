@@ -540,7 +540,6 @@ export default function ExercisePage() {
         <Container>
           <Header>
             <PageTitle>영상을 보고 따라해보세요!</PageTitle>
-            <StopAllButton onClick={handleStopAll}>운동 종료</StopAllButton>
           </Header>
 
           <VideoBox>
@@ -636,6 +635,11 @@ export default function ExercisePage() {
               );
             })}
           </ListSection>
+
+          <EmergencyStop onClick={handleStopAll}>
+            ⚠️ 몸이 불편하거나 운동을 중단해야 한다면
+            <EmergencyStopLabel>지금 바로 운동 중단하기</EmergencyStopLabel>
+          </EmergencyStop>
 
           <Modal
             isOpen={stopModal}
@@ -738,20 +742,37 @@ const PageTitle = styled.h1`
   margin: 0;
 `;
 
-const StopAllButton = styled.button`
-  ${({ theme }) => theme.typography.caption}
-  color: ${({ theme }) => theme.colors.subtext};
-  background: transparent;
-  border: 1px solid ${({ theme }) => theme.colors.sub};
-  border-radius: ${({ theme }) => theme.borderRadius.full};
-  padding: 6px 14px;
+const EmergencyStop = styled.button`
+  width: 100%;
+  margin-top: ${({ theme }) => theme.spacing.lg};
+  padding: 18px 16px 14px;
+  background: #fff5f5;
+  border: 2px solid #e53935;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  color: #e53935;
   cursor: pointer;
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  ${({ theme }) => theme.typography.caption}
+  font-weight: 500;
+  transition: all 0.2s;
 
   &:hover {
-    border-color: ${({ theme }) => theme.colors.point};
-    color: ${({ theme }) => theme.colors.point};
+    background: #ffebee;
   }
+
+  &:active {
+    transform: scale(0.98);
+  }
+`;
+
+const EmergencyStopLabel = styled.span`
+  font-size: 17px;
+  font-weight: 700;
+  color: #e53935;
+  letter-spacing: -0.3px;
 `;
 
 const VideoBox = styled.div`

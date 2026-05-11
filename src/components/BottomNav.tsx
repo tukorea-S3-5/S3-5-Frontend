@@ -29,7 +29,13 @@ const BottomNav: React.FC<BottomNavProps> = ({ items = defaultItems }) => {
         <NavItem
           key={item.path}
           $active={location.pathname === item.path}
-          onClick={() => navigate(item.path)}
+          onClick={() => {
+            navigate(item.path);
+
+            if (item.path === '/postnatal') {
+              alert('해당 기능은 아직 준비중이에요 🥲');
+            }
+          }}
         >
           <NavIcon>{item.icon}</NavIcon>
           <NavLabel $active={location.pathname === item.path}>{item.label}</NavLabel>

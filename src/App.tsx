@@ -19,6 +19,7 @@ import LoadingOverlay from "./components/LoadingOverlay";
 import ReportPage from "./pages/Exercise/ReportPage";
 import PregnancyOnboardingPage from "./pages/PregnancyOnboarding/PregnancyOnboardingPage";
 import ExerciseListPage from "./pages/ExerciseList/ExerciseListPage";
+import MyPage from "./pages/MyPage";
 
 function App() {
   return (
@@ -103,14 +104,12 @@ function AppRoutes() {
           <Route path="exercises" element={<ExerciseListPage />} />
           <Route path="exercise" element={<ExercisePage />} />
           <Route path="report" element={<ReportPage />} />
+
           <Route
             path="record"
             element={<div style={{ padding: "20px" }}>기록 페이지</div>}
           />
-          <Route
-            path="profile"
-            element={<div style={{ padding: "20px" }}>프로필 페이지</div>}
-          />
+          <Route path="profile" element={<MyPage />} />
         </Route>
       </Route>
     </Routes>

@@ -48,6 +48,13 @@ interface Exercise {
   videoUrl: string;
 }
 
+interface GuidelineResponse {
+  week: number;
+  trimester: number;
+  title: string;
+  guidelines: string[];
+}
+
 const toExercise = (e: ExerciseFromAPI): Exercise => ({
   id: String(e.exercise_id),
   title: e.exercise_name,
@@ -98,6 +105,15 @@ const ExerciseListPage = () => {
     ...data.recommend.map(toExercise),
     ...data.caution.map(toExercise),
   ];
+
+  // 분기별 가이드라인 상태
+  const [guideline, setGuideline] = useState<GuidelineResponse | null>(null);
+
+  useEffect(() => {
+    getJson<GuidelineResponse>("/pregnancy/guideline")
+      .then((json) => setGuideline(json))
+      .catch((e) => console.error("가이드라인 조회 실패", e));
+  }, []);
 
   const handleExerciseClick = (id: string) => {
     // 추천/주의 운동만 선택 가능
@@ -157,14 +173,15 @@ const ExerciseListPage = () => {
         </p>
       </Card>
 
-      <Card variant="info" icon="💡" title="3분기 운동 가이드라인 (ACOG)">
-        <ul>
-          <li>운동 강도와 시간을 점진적으로 줄이기</li>
-          <li>낙상 위험이 높은 운동 피하기</li>
-          <li>골반저근 운동(케겔) 지속</li>
-          <li>조기 진통 징후 시 즉시 운동 중단</li>
-        </ul>
-      </Card>
+      {guideline && (
+        <Card variant="info" icon="💡" title={guideline.title}>
+          <ul>
+            {guideline.guidelines.map((g, idx) => (
+              <li key={idx}>{g}</li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <TabMenu
         tabs={tabs}
