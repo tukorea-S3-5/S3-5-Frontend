@@ -39,11 +39,6 @@ interface RecommendResponse {
   not_recommend: ExerciseFromAPI[];
 }
 
-interface Guideline {
-  title: string;
-  guidelines: string[];
-}
-
 interface Exercise {
   id: string;
   title: string;
@@ -76,7 +71,6 @@ const ExerciseListPage = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [guideline, setGuideline] = useState<Guideline | null>(null);
 
   useEffect(() => {
     getJson<RecommendResponse>(`/recommend?t=${Date.now()}`)
@@ -113,15 +107,6 @@ const ExerciseListPage = () => {
     setSelectedExercises((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
-  };
-
-  const startSession = async (targetExercises: Exercise[]) => {
-    if (targetExercises.length === 0) throw new Error('No exercises selected');
-    // record/start가 세션+레코드 모두 생성하므로 session/start는 호출하지 않음
-    const res = await postJson<SessionResponse>('/exercise/record/start', {
-      exercise_ids: targetExercises.map(e => Number(e.id)),
-    });
-    return { session: { ...res.session, records: res.records } };
   };
 
   const handleStartAll = async () => {
@@ -172,15 +157,14 @@ const ExerciseListPage = () => {
         </p>
       </Card>
 
-      {guideline && (
-        <Card variant="info" icon="🏃" title={guideline.title}>
-          <ul>
-            {guideline.guidelines.map((g, i) => (
-              <li key={i}>{g}</li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      <Card variant="info" icon="💡" title="3분기 운동 가이드라인 (ACOG)">
+        <ul>
+          <li>운동 강도와 시간을 점진적으로 줄이기</li>
+          <li>낙상 위험이 높은 운동 피하기</li>
+          <li>골반저근 운동(케겔) 지속</li>
+          <li>조기 진통 징후 시 즉시 운동 중단</li>
+        </ul>
+      </Card>
 
       <TabMenu
         tabs={tabs}
