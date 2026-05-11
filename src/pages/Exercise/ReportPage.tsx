@@ -1,9 +1,18 @@
-import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
-import MomiCompleted from '@assets/icons/images/MOMI_completed.png';
-import { getJson } from '../../api/http';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Area, AreaChart } from 'recharts';
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import styled from "styled-components";
+import MomiCompleted from "@assets/icons/images/MOMI_completed.png";
+import { getJson } from "../../api/http";
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  Area,
+  AreaChart,
+  Line,
+} from "recharts";
 
 interface ExerciseSummary {
   exercise_name: string;
@@ -16,45 +25,79 @@ interface ReportResponse {
   total_duration: number;
   avg_heart_rate: number | null;
   max_heart_rate: number | null;
+  status?: "COMPLETED" | "ABORTED" | string;
   exercises: ExerciseSummary[];
 }
 
 interface LocationState {
   sessionId?: number;
+  heartRates?: number[];
 }
 
-const generateHeartRateData = (avg: number, max: number) => {
-  const points = 20;
-  return Array.from({ length: points }, (_, i) => {
-    const progress = i / (points - 1);
-    // 운동 중반에 최고 심박수, 시작/끝은 낮게
-    const curve = Math.sin(progress * Math.PI) * (max - avg) * 0.8;
-    const noise = (Math.random() - 0.5) * 10;
-    return {
-      time: `${Math.floor((i / points) * 20)}:00`,
-      bpm: Math.round(Math.max(60, avg - 15 + curve + noise)),
-    };
-  });
-};
+// 만약에 llm에 이런 내용 추가한다고 하면 나중에 바꿔야 함
+const getComment = (avg: number | null, status?: string): string => {
+  if (status === "ABORTED") {
+    return "운동을 중간에 종료했지만, 진행한 구간의 기록은 저장되었어요. 몸 상태가 불편했다면 충분히 쉬어주세요.";
+  }
 
-const getComment = (avg: number): string => {
-  if (avg >= 130) return '운동 강도가 꽤 높았어요! 다음엔 충분한 휴식을 취하세요. 💪';
-  if (avg >= 115) return '무리한 수준은 아니지만,\n다음에는 호흡을 조금 더 천천히 해보세요.';
-  if (avg >= 100) return '적절한 강도로 운동했어요! 오늘 수고했어요 🌸';
-  return '가볍고 안전하게 운동했어요. 꾸준히 하는 게 최고예요! 🤰';
+  if (avg === null) {
+    return "심박수 데이터는 부족하지만, 운동 기록은 정상적으로 저장되었어요.";
+  }
+
+  if (avg >= 130) {
+    return "운동 강도가 꽤 높았어요! 다음엔 충분한 휴식을 취하세요. 💪";
+  }
+
+  if (avg >= 115) {
+    return "무리한 수준은 아니지만,\n다음에는 호흡을 조금 더 천천히 해보세요.";
+  }
+
+  if (avg >= 100) {
+    return "적절한 강도로 운동했어요! 오늘 수고했어요 🌸";
+  }
+
+  return "가볍고 안전하게 운동했어요. 꾸준히 하는 게 최고예요! 🤰";
 };
 
 const formatDuration = (seconds: number) => {
-  if (!seconds) return '0분';
+  if (!seconds) return "0분";
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return s > 0 ? `${m}분 ${s}초` : `${m}분`;
 };
 
+const toChartData = (heartRates: number[], pointCount = 60) => {
+  if (heartRates.length <= pointCount) {
+    return heartRates.map((bpm, index) => ({
+      idx: index,
+      avgBpm: bpm,
+      maxBpm: bpm,
+    }));
+  }
+
+  const chunkSize = Math.ceil(heartRates.length / pointCount);
+
+  return Array.from(
+    { length: Math.ceil(heartRates.length / chunkSize) },
+    (_, i) => {
+      const chunk = heartRates.slice(i * chunkSize, (i + 1) * chunkSize);
+
+      const avg = chunk.reduce((sum, bpm) => sum + bpm, 0) / chunk.length;
+
+      return {
+        idx: i,
+        avgBpm: Math.round(avg),
+        maxBpm: Math.max(...chunk),
+      };
+    },
+  );
+};
+
 export default function ReportPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { sessionId } = (location.state as LocationState) ?? {};
+  const { sessionId, heartRates = [] } =
+    (location.state as LocationState) ?? {};
 
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,21 +115,23 @@ export default function ReportPage() {
 
     const fetchReport = async (attempt: number) => {
       try {
-        console.log(`[ReportPage] GET /report/session/${sessionId} 시도 ${attempt}/${MAX_RETRY}`);
-        const res = await getJson<ReportResponse>(`/report/session/${sessionId}`);
+        console.log(
+          `[ReportPage] GET /report/session/${sessionId} 시도 ${attempt}/${MAX_RETRY}`,
+        );
+        const res = await getJson<ReportResponse>(
+          `/report/session/${sessionId}`,
+        );
         if (!cancelled) {
-          console.log('[ReportPage] 리포트 성공:', res);
-          // TODO: IoT 연동 시 제거 - 심박수 null이면 임의값 채우기
-          const filled = {
-            ...res,
-            avg_heart_rate: res.avg_heart_rate ?? (105 + Math.floor(Math.random() * 15)), // 105~119
-            max_heart_rate: res.max_heart_rate ?? (120 + Math.floor(Math.random() * 10)), // 120~129
-          };
-          setReport(filled);
+          console.log("[ReportPage] 리포트 성공:", res);
+          setReport(res);
           setLoading(false);
         }
-      } catch (e: any) {
-        console.warn(`[ReportPage] 실패 (${attempt}/${MAX_RETRY}):`, e?.message);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        console.warn(
+          `[ReportPage] 실패 (${attempt}/${MAX_RETRY}):`,
+          message,
+        );
         if (attempt < MAX_RETRY && !cancelled) {
           setTimeout(() => fetchReport(attempt + 1), RETRY_DELAY);
         } else if (!cancelled) {
@@ -97,30 +142,47 @@ export default function ReportPage() {
     };
 
     fetchReport(1);
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId]);
 
-  const handleHome = () => navigate('/home');
+  const handleHome = () => navigate("/home");
 
   const handleShare = () => {
     if (!report) return;
-    const text = `🤰 오늘의 운동 리포트\n총 운동시간: ${formatDuration(report.total_duration)}\n평균 심박수: ${report.avg_heart_rate ?? '--'}bpm\n#MOMFIT #임산부운동`;
+    const text = `🤰 오늘의 운동 리포트\n총 운동시간: ${formatDuration(report.total_duration)}\n평균 심박수: ${report.avg_heart_rate ?? "--"}bpm\n#MOMFIT #임산부운동`;
     if (navigator.share) {
-      navigator.share({ title: 'MOMFIT 운동 리포트', text });
+      navigator.share({ title: "MOMFIT 운동 리포트", text });
     } else {
-      navigator.clipboard.writeText(text).then(() => alert('클립보드에 복사되었어요! 📋'));
+      navigator.clipboard
+        .writeText(text)
+        .then(() => alert("클립보드에 복사되었어요! 📋"));
     }
   };
 
   const handleSave = () => {
-    alert('저장 기능은 준비 중이에요!');
+    alert("저장 기능은 준비 중이에요!");
   };
 
-  if (loading) return <Container><LoadingText>리포트 불러오는 중...</LoadingText></Container>;
+  const chartData = toChartData(heartRates);
+
+  // 수행한 운동만 필터링
+  const performedExercises =
+    report?.exercises.filter((ex) => (ex.duration ?? 0) > 0) ?? [];
+
+  const isAborted = report?.status === "ABORTED";
+
+  if (loading)
+    return (
+      <Container>
+        <LoadingText>리포트 불러오는 중...</LoadingText>
+      </Container>
+    );
 
   return (
     <Container>
-      <Title>운동을 완료했어요!</Title>
+      <Title>{isAborted ? "운동을 중단했어요" : "운동을 완료했어요!"}</Title>
       <CharacterImage src={MomiCompleted} alt="운동 완료" />
 
       {error || !report ? (
@@ -138,16 +200,16 @@ export default function ReportPage() {
             <StatCard>
               <StatLabel>❤️ 평균 심박수</StatLabel>
               <StatValue>
-                {report.avg_heart_rate ?? '--'}
-                <StatUnit>bpm</StatUnit>
+                {report.avg_heart_rate ?? "--"}
+                {report.avg_heart_rate !== null && <StatUnit>bpm</StatUnit>}
               </StatValue>
             </StatCard>
 
             <StatCard>
               <StatLabel>📈 최고 심박수</StatLabel>
               <StatValue>
-                {report.max_heart_rate ?? '--'}
-                <StatUnit>bpm</StatUnit>
+                {report.max_heart_rate ?? "--"}
+                {report.max_heart_rate !== null && <StatUnit>bpm</StatUnit>}
               </StatValue>
             </StatCard>
           </StatsGrid>
@@ -155,11 +217,11 @@ export default function ReportPage() {
           {/* 운동별 수행 시간 */}
           <ExerciseListCard>
             <SectionTitle>운동별 수행 시간</SectionTitle>
-            {report.exercises.map((ex, i) => (
+            {performedExercises.map((ex, i) => (
               <ExerciseRow key={i}>
                 <ExerciseName>{ex.exercise_name}</ExerciseName>
                 <ExerciseDuration>
-                  {ex.duration != null ? formatDuration(ex.duration) : '-'}
+                  {ex.duration != null ? formatDuration(ex.duration) : "-"}
                 </ExerciseDuration>
               </ExerciseRow>
             ))}
@@ -168,54 +230,87 @@ export default function ReportPage() {
           {/* 심박수 변화 그래프 */}
           <HeartRateCard>
             <SectionTitle>심박수 변화</SectionTitle>
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart
-                data={generateHeartRateData(
-                  report.avg_heart_rate ?? 110,
-                  report.max_heart_rate ?? 125
-                )}
-                margin={{ top: 5, right: 8, left: -20, bottom: 5 }}
-              >
-                <defs>
-                  <linearGradient id="hrGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ff5038" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#ff5038" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0e8e5" />
-                <XAxis dataKey="time" tick={{ fontSize: 9, fill: '#8b7e74' }} tickLine={false} />
-                <YAxis domain={[60, 140]} tick={{ fontSize: 9, fill: '#8b7e74' }} tickLine={false} />
-                <Tooltip
-                  formatter={(v) => [`${v} bpm`, '심박수']}
-                  contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #f0e8e5' }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="bpm"
-                  stroke="#ff5038"
-                  strokeWidth={2}
-                  fill="url(#hrGradient)"
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+
+            <ChartDescription>
+              센서 수신 간격이 일정하지 않아 전체 데이터를 구간별로 나누고, 평균
+              심박수와 구간 최고 심박수를 함께 표시했어요.
+            </ChartDescription>
+
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 5, right: 8, left: -20, bottom: 5 }}
+                >
+                  <defs>
+                    <linearGradient id="hrGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ff5038" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#ff5038" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0e8e5" />
+                  <XAxis
+                    dataKey="idx"
+                    tick={false}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[60, 160]}
+                    ticks={[60, 80, 100, 120, 140, 160]}
+                    tick={{ fontSize: 10, fill: "#8b7e74" }}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    formatter={(v, name) => [`${v} bpm`, name]}
+                    labelFormatter={(label) => `${Number(label) + 1}번째 구간`}
+                    contentStyle={{
+                      fontSize: 11,
+
+                      borderRadius: 8,
+
+                      border: "1px solid #f0e8e5",
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="avgBpm"
+                    name="평균 심박수"
+                    stroke="#ff5038"
+                    strokeWidth={2}
+                    fill="url(#hrGradient)"
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="maxBpm"
+                    name="구간 최고 심박수"
+                    stroke="#d9362b"
+                    strokeWidth={1.5}
+                    dot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyChartText>심박수 데이터가 없습니다</EmptyChartText>
+            )}
           </HeartRateCard>
 
           {/* 오늘의 운동 한마디 */}
           <CommentCard>
             <CommentTitle>오늘의 운동 한마디</CommentTitle>
-            <CommentText>{getComment(report.avg_heart_rate ?? 110)}</CommentText>
+            <CommentText>
+              {getComment(report.avg_heart_rate, report.status)}
+            </CommentText>
           </CommentCard>
-
         </>
       )}
 
       <ButtonRow>
         <OutlineButton onClick={handleShare}>🔗 공유하기</OutlineButton>
-        <OutlineButton onClick={handleSave}>
-          🔖 저장하기
-        </OutlineButton>
+        <OutlineButton onClick={handleSave}>🔖 저장하기</OutlineButton>
       </ButtonRow>
       <HomeButton onClick={handleHome}>홈으로 돌아가기</HomeButton>
     </Container>
@@ -350,8 +445,13 @@ const OutlineButton = styled.button`
   ${({ theme }) => theme.typography.button}
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { border-color: ${({ theme }) => theme.colors.point}; color: ${({ theme }) => theme.colors.point}; }
-  &:active { transform: scale(0.98); }
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.point};
+    color: ${({ theme }) => theme.colors.point};
+  }
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 const HeartRateCard = styled.div`
   background: ${({ theme }) => theme.colors.white};
@@ -360,6 +460,20 @@ const HeartRateCard = styled.div`
   padding: ${({ theme }) => theme.spacing.md};
   margin-bottom: ${({ theme }) => theme.spacing.md};
 `;
+
+const ChartDescription = styled.p`
+  ${({ theme }) => theme.typography.caption}
+  color: ${({ theme }) => theme.colors.subtext};
+  margin: 0 0 ${({ theme }) => theme.spacing.sm} 0;
+`;
+
+const EmptyChartText = styled.div`
+  ${({ theme }) => theme.typography.body2}
+  color: ${({ theme }) => theme.colors.subtext};
+  text-align: center;
+  padding: 20px;
+`;
+
 const CommentCard = styled.div`
   background: ${({ theme }) => theme.colors.light};
   border-radius: ${({ theme }) => theme.borderRadius.lg};
@@ -388,6 +502,10 @@ const HomeButton = styled.button`
   ${({ theme }) => theme.typography.button}
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { filter: brightness(0.92); }
-  &:active { transform: scale(0.98); }
+  &:hover {
+    filter: brightness(0.92);
+  }
+  &:active {
+    transform: scale(0.98);
+  }
 `;

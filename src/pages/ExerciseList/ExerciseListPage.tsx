@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import styled from 'styled-components';
-import { useNavigate } from 'react-router-dom';
-import { Card, TabMenu } from '../../components';
-import ExerciseCard from './components/ExerciseCard';
-import MOMI_empty from '@assets/icons/images/MOMI_empty.png';
-import { getJson, postJson } from '../../api/http';
+import { useEffect, useState } from "react";
+import styled from "styled-components";
+import { useNavigate } from "react-router-dom";
+import { Card, TabMenu } from "../../components";
+import ExerciseCard from "./components/ExerciseCard";
+import MOMI_empty from "@assets/icons/images/MOMI_empty.png";
+import { getJson, postJson } from "../../api/http";
 
 interface ExerciseFromAPI {
   exercise_id: number;
@@ -59,30 +59,30 @@ const toExercise = (e: ExerciseFromAPI): Exercise => ({
   description: e.description,
   category: e.category_name,
   difficulty: e.difficulty_label,
-  videoUrl: e.video_url ?? '',
+  videoUrl: e.video_url ?? "",
 });
 
-const TAB_KEYS = ['추천', '주의', '비추천'] as const;
-type TabKey = typeof TAB_KEYS[number];
+const TAB_KEYS = ["추천", "주의", "비추천"] as const;
+type TabKey = (typeof TAB_KEYS)[number];
 
 const ExerciseListPage = () => {
   const navigate = useNavigate();
-  const [selectedTab, setSelectedTab] = useState<TabKey>('추천');
+  const [selectedTab, setSelectedTab] = useState<TabKey>("추천");
   const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
-  const [data, setData] = useState<RecommendResponse>({ recommend: [], caution: [], not_recommend: [] });
+  const [data, setData] = useState<RecommendResponse>({
+    recommend: [],
+    caution: [],
+    not_recommend: [],
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [guideline, setGuideline] = useState<Guideline | null>(null);
 
   useEffect(() => {
-    Promise.allSettled([
-      getJson<RecommendResponse>(`/recommend?t=${Date.now()}`),
-      getJson<Guideline>('/pregnancy/guideline'),
-    ]).then(([recommendRes, guidelineRes]) => {
-      if (recommendRes.status === 'fulfilled') setData(recommendRes.value);
-      else setError(true);
-      if (guidelineRes.status === 'fulfilled') setGuideline(guidelineRes.value);
-    }).finally(() => setLoading(false));
+    getJson<RecommendResponse>(`/recommend?t=${Date.now()}`)
+      .then((json) => setData(json))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
   }, []);
 
   const exercisesByTab: Record<TabKey, Exercise[]> = {
@@ -91,7 +91,7 @@ const ExerciseListPage = () => {
     비추천: data.not_recommend.map(toExercise),
   };
 
-  const tabs = TAB_KEYS.map(key => ({
+  const tabs = TAB_KEYS.map((key) => ({
     key,
     label: key,
     count: exercisesByTab[key].length,
@@ -99,9 +99,19 @@ const ExerciseListPage = () => {
 
   const exercises = exercisesByTab[selectedTab];
 
+  // 선택 시작은 추천/주의 운동을 섞어서 실행할 수 있도록 두 목록을 합쳐서 사용
+  const selectableExercises = [
+    ...data.recommend.map(toExercise),
+    ...data.caution.map(toExercise),
+  ];
+
   const handleExerciseClick = (id: string) => {
-    setSelectedExercises(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    // 추천/주의 운동만 선택 가능
+    // 비추천 운동은 목록에서 확인만 가능하고 세션에 포함하지 않음
+    if (selectedTab === "비추천") return;
+
+    setSelectedExercises((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
   };
 
@@ -116,20 +126,38 @@ const ExerciseListPage = () => {
 
   const handleStartAll = async () => {
     try {
-      const { session } = await startSession(exercises);
-      navigate('/exercise', { state: { exercises, session } });
+      const res = await postJson<SessionResponse>("/exercise/session/start", {
+        type: selectedTab === "주의" ? "caution" : "recommend",
+      });
+
+      navigate("/exercise", {
+        state: {
+          exercises,
+          session: { ...res.session, records: res.records },
+        },
+      });
     } catch {
-      navigate('/exercise', { state: { exercises } });
+      navigate("/exercise", { state: { exercises } });
     }
   };
 
   const handleStartSelected = async () => {
-    const selected = exercises.filter(e => selectedExercises.includes(e.id));
+    const selected = selectableExercises.filter((e) =>
+      selectedExercises.includes(e.id),
+    );
+
     try {
-      const { session } = await startSession(selected);
-      navigate('/exercise', { state: { exercises: selected, session } });
+      const res = await postJson<SessionResponse>("/exercise/record/start", {
+        exercise_ids: selected.map((e) => Number(e.id)),
+      });
+      navigate("/exercise", {
+        state: {
+          exercises: selected,
+          session: { ...res.session, records: res.records },
+        },
+      });
     } catch {
-      navigate('/exercise', { state: { exercises: selected } });
+      navigate("/exercise", { state: { exercises: selected } });
     }
   };
 
@@ -138,7 +166,10 @@ const ExerciseListPage = () => {
       <Title>오늘의 추천 운동</Title>
 
       <Card variant="warning" icon="⚠️" title="운동 전 주의사항">
-        <p>운동 시작 전 반드시 담당 의사와 상담하세요. 출혈, 어지러움, 호흡곤란 등의 증상이 나타나면 즉시 중단하세요.</p>
+        <p>
+          운동 시작 전 반드시 담당 의사와 상담하세요. 출혈, 어지러움, 호흡곤란
+          등의 증상이 나타나면 즉시 중단하세요.
+        </p>
       </Card>
 
       {guideline && (
@@ -156,22 +187,29 @@ const ExerciseListPage = () => {
         activeTab={selectedTab}
         onTabChange={(key) => {
           setSelectedTab(key as TabKey);
-          setSelectedExercises([]);
         }}
       />
 
       <ExerciseList>
         {loading ? (
-          <EmptyState><EmptyText>운동 목록을 불러오는 중...</EmptyText></EmptyState>
+          <EmptyState>
+            <EmptyText>운동 목록을 불러오는 중...</EmptyText>
+          </EmptyState>
         ) : error ? (
-          <EmptyState><EmptyText>운동 목록을 불러오지 못했어요 😢{'\n'}잠시 후 다시 시도해주세요</EmptyText></EmptyState>
+          <EmptyState>
+            <EmptyText>
+              운동 목록을 불러오지 못했어요 😢{"\n"}잠시 후 다시 시도해주세요
+            </EmptyText>
+          </EmptyState>
         ) : exercises.length === 0 ? (
           <EmptyState>
             <EmptyImage src={MOMI_empty} alt="운동 없음" />
-            <EmptyText>조건에 맞는 추천 운동이 없네요!{'\n'}오늘은 푹 쉬세요 🌸</EmptyText>
+            <EmptyText>
+              조건에 맞는 추천 운동이 없네요!{"\n"}오늘은 푹 쉬세요 🌸
+            </EmptyText>
           </EmptyState>
         ) : (
-          exercises.map(exercise => (
+          exercises.map((exercise) => (
             <ExerciseCard
               key={exercise.id}
               id={exercise.id}
@@ -179,18 +217,26 @@ const ExerciseListPage = () => {
               description={exercise.description}
               category={exercise.category}
               difficulty={exercise.difficulty}
-              selected={selectedExercises.includes(exercise.id)}
+              selected={
+                selectedTab !== "비추천" &&
+                selectedExercises.includes(exercise.id)
+              }
               onClick={() => handleExerciseClick(exercise.id)}
             />
           ))
         )}
       </ExerciseList>
 
-      {exercises.length > 0 && (
+      {selectedTab !== "비추천" && exercises.length > 0 && (
         <ButtonArea>
           <OutlineButton onClick={handleStartAll}>전체 시작</OutlineButton>
-          <FillButton disabled={selectedExercises.length === 0} onClick={handleStartSelected}>
-            선택한 운동 시작
+          <FillButton
+            disabled={selectedExercises.length === 0}
+            onClick={handleStartSelected}
+          >
+            {selectedExercises.length > 0
+              ? `선택한 운동 시작 (${selectedExercises.length})`
+              : "선택한 운동 시작"}
           </FillButton>
         </ButtonArea>
       )}
@@ -198,7 +244,9 @@ const ExerciseListPage = () => {
   );
 };
 
-const Container = styled.div`padding-bottom: 100px;`;
+const Container = styled.div`
+  padding-bottom: 100px;
+`;
 
 const Title = styled.h1`
   ${({ theme }) => theme.typography.heading1}
@@ -256,8 +304,12 @@ const OutlineButton = styled.button`
   color: ${({ theme }) => theme.colors.point};
   ${({ theme }) => theme.typography.button}
   cursor: pointer;
-  &:hover { background: ${({ theme }) => theme.colors.light}; }
-  &:active { transform: scale(0.98); }
+  &:hover {
+    background: ${({ theme }) => theme.colors.light};
+  }
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 const FillButton = styled.button<{ disabled: boolean }>`
@@ -265,13 +317,18 @@ const FillButton = styled.button<{ disabled: boolean }>`
   padding: ${({ theme }) => theme.spacing.md};
   border-radius: ${({ theme }) => theme.borderRadius.md};
   border: none;
-  background: ${({ theme, disabled }) => disabled ? theme.colors.middle : theme.colors.point};
+  background: ${({ theme, disabled }) =>
+    disabled ? theme.colors.middle : theme.colors.point};
   color: ${({ theme }) => theme.colors.white};
   ${({ theme }) => theme.typography.button}
-  cursor: ${({ disabled }) => disabled ? 'not-allowed' : 'pointer'};
-  opacity: ${({ disabled }) => disabled ? 0.6 : 1};
-  &:hover:not(:disabled) { filter: brightness(0.9); }
-  &:active:not(:disabled) { transform: scale(0.98); }
+  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
+  opacity: ${({ disabled }) => (disabled ? 0.6 : 1)};
+  &:hover:not(:disabled) {
+    filter: brightness(0.9);
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
 `;
 
 export default ExerciseListPage;
