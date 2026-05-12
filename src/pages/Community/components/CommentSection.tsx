@@ -1,6 +1,6 @@
-import styled from "styled-components";
-import { getJson, postJson } from "../../../api/http";
 import { useState } from "react";
+import styled from "styled-components";
+import { postJson } from "../../../api/http";
 
 export interface CommentItem {
   id: number;
@@ -14,32 +14,23 @@ interface Props {
   postId: number;
 }
 
-function timeAgo(iso: string) {
-  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (min < 1) return "방금 전";
-  if (min < 60) return `${min}분 전`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h}시간 전`;
-  return `${Math.floor(h / 24)}일 전`;
-}
-
 export default function CommentSection({ postId }: Props) {
   const [comments, setComments] = useState<CommentItem[]>([]);
-  const [input, setInput]       = useState("");
-  const [busy, setBusy]         = useState(false);
-
-  const reload = async () => {
-    const d = await getJson<{ comments: CommentItem[] }>(`/community/posts/${postId}`);
-    setComments(d.comments);
-  };
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const send = async () => {
     if (!input.trim() || busy) return;
     setBusy(true);
     try {
-      await postJson("/community/comments", { postId, content: input.trim() });
-      await reload();
+      const newComment = await postJson("/community/comments", {
+        postId: Number(postId),
+        content: input.trim(),
+      }) as CommentItem;
+      setComments((prev) => [...prev, newComment]);
       setInput("");
+    } catch (e) {
+      console.error("[CommentSection] 전송 실패:", e);
     } finally {
       setBusy(false);
     }
@@ -49,100 +40,42 @@ export default function CommentSection({ postId }: Props) {
     <Wrap>
       {comments.map((c) => (
         <Bubble key={c.id}>
-          <Av size={26} />
+          <Av />
           <BubbleBody>
-            <BubbleMeta>
-              <BubbleAuthor>{c.userId}</BubbleAuthor>
-              <BubbleTime>{timeAgo(c.createdAt)}</BubbleTime>
-            </BubbleMeta>
-            <BubbleText>{c.content}</BubbleText>
+            <Meta>
+              <Author>{c.userId}</Author>
+            </Meta>
+            <Text>{c.content}</Text>
           </BubbleBody>
         </Bubble>
       ))}
 
       <InputRow>
-        <Av size={26} />
+        <Av />
         <TextBox
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
           placeholder="댓글을 입력하세요..."
         />
+        <SendBtn onClick={send} disabled={busy}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+        </SendBtn>
       </InputRow>
     </Wrap>
   );
 }
 
-// ── Styled ────────────────────────────────────────────────────
-const Av = styled.div<{ size: number }>`
-  width: ${(p) => p.size}px;
-  height: ${(p) => p.size}px;
-  border-radius: 50%;
-  background: #cfcfcf;
-  flex-shrink: 0;
-`;
-
-const Wrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 10px;
-`;
-
-const Bubble = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  background: #fbe3dd;
-  border-radius: 12px;
-  padding: 10px 12px;
-`;
-
-const BubbleBody = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-`;
-
-const BubbleMeta = styled.div`
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-`;
-
-const BubbleAuthor = styled.span`
-  font-weight: 700;
-  font-size: 13px;
-  color: #2c1b1b;
-`;
-
-const BubbleTime = styled.span`
-  font-size: 11px;
-  color: #a8a8a8;
-`;
-
-const BubbleText = styled.p`
-  font-size: 13px;
-  color: #2c1b1b;
-  margin: 0;
-`;
-
-const InputRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #f6f6f6;
-  border-radius: 999px;
-  padding: 8px 14px 8px 8px;
-`;
-
-const TextBox = styled.input`
-  flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 13px;
-  color: #2c1b1b;
-  &::placeholder { color: #bfbfbf; }
-`;
+const Av = styled.div`width: 26px; height: 26px; border-radius: 50%; background: #cfcfcf; flex-shrink: 0;`;
+const Wrap = styled.div`display: flex; flex-direction: column; gap: 10px; margin-top: 10px;`;
+const Bubble = styled.div`display: flex; align-items: flex-start; gap: 10px; background: #fbe3dd; border-radius: 12px; padding: 10px 12px;`;
+const BubbleBody = styled.div`display: flex; flex-direction: column; gap: 2px; flex: 1;`;
+const Meta = styled.div`display: flex; align-items: baseline; gap: 6px;`;
+const Author = styled.span`font-weight: 700; font-size: 13px; color: #2c1b1b;`;
+const Text = styled.p`font-size: 13px; color: #2c1b1b; margin: 0;`;
+const InputRow = styled.div`display: flex; align-items: center; gap: 10px; background: #f6f6f6; border-radius: 999px; padding: 8px 14px 8px 8px;`;
+const TextBox = styled.input`flex: 1; border: none; outline: none; background: transparent; font-size: 13px; color: #2c1b1b; &::placeholder { color: #bfbfbf; }`;
+const SendBtn = styled.button`background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; color: #e88b8b; &:disabled { opacity: 0.4; cursor: not-allowed; }`;

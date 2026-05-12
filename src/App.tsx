@@ -106,6 +106,7 @@ function AppRoutes() {
           <Route path="exercise" element={<ExercisePage />} />
           <Route path="report" element={<ReportPage />} />
           <Route path="community" element={<CommunityPage />} />
+          
 
           <Route
             path="record"
