@@ -53,10 +53,8 @@ function isToday(dateStr: string) {
 }
 
 // ── Page ──────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────
 export default function MyPage() {
-export default function MyPage() {
-  const [user, setUser]             = useState<UserInfo | null>(null);
-
   const [user, setUser]             = useState<UserInfo | null>(null);
   const [pregnancy, setPregnancy]   = useState<PregnancyInfo | null>(null);
   const [weeklyHR, setWeeklyHR]     = useState<DailyHeartRate[]>(
