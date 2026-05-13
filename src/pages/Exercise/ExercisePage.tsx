@@ -78,40 +78,37 @@ export default function ExercisePage() {
     resetSessionHeartRates,
   } = useHeartRateBle();
 
-  const allowNavigationRef   = useRef(false);
-  const playerRef            = useRef<YTPlayer | null>(null);
-  const playerElRef          = useRef<HTMLDivElement>(null);
-  const timerRef             = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastVibrationAtRef   = useRef<number>(0);
+  const allowNavigationRef = useRef(false);
+  const playerRef = useRef<YTPlayer | null>(null);
+  const playerElRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastVibrationAtRef = useRef<number>(0);
 
-  const [currentIndex, setCurrentIndex]   = useState(0);
-  const [playState, setPlayState]         = useState<PlayState>("idle");
-  const [duration, setDuration]           = useState(0);
-  const [elapsed, setElapsed]             = useState(0);
-  const [ytReady, setYtReady]             = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [playState, setPlayState] = useState<PlayState>("idle");
+  const [duration, setDuration] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [ytReady, setYtReady] = useState(false);
   const [endedExerciseIds, setEndedExerciseIds] = useState<number[]>([]);
-  const [stopModal, setStopModal]         = useState(false);
-  const [leaveModal, setLeaveModal]       = useState(false);
-  const [switchModal, setSwitchModal]     = useState<{ open: boolean; targetIndex: number }>({ open: false, targetIndex: 0 });
+  const [stopModal, setStopModal] = useState(false);
+  const [leaveModal, setLeaveModal] = useState(false);
+  const [switchModal, setSwitchModal] = useState<{ open: boolean; targetIndex: number }>({ open: false, targetIndex: 0 });
   const [maxAllowedBpm, setMaxAllowedBpm] = useState<number | null>(null);
 
-  // ── 오늘 안정 심박수 여부 ─────────────────────────────────
-  const [hasTodayHR, setHasTodayHR]       = useState<boolean | null>(null); // null = 로딩 중
-  const [showHRModal, setShowHRModal]     = useState(false);
+  const [hasTodayHR, setHasTodayHR] = useState<boolean | null>(null);
+  const [showHRModal, setShowHRModal] = useState(false);
 
-  // 오늘 심박수 확인: GET /heartrate/weekly
   useEffect(() => {
-    getJson<HeartRateRecord[]>('/heartrate/weekly')
+    getJson<HeartRateRecord[]>("/heartrate/weekly")
       .then((data) => {
         const todayRec = data.find(
-          (r) => new Date(r.date).toDateString() === new Date().toDateString()
+          (r) => new Date(r.date).toDateString() === new Date().toDateString(),
         );
         const has = !!todayRec;
         setHasTodayHR(has);
-        // 없으면 바로 모달 오픈
         if (!has) setShowHRModal(true);
       })
-      .catch(() => setHasTodayHR(true)); // 실패 시 막지 않음
+      .catch(() => setHasTodayHR(true));
   }, []);
 
   const current = exercises[currentIndex];
@@ -122,7 +119,9 @@ export default function ExercisePage() {
 
   useEffect(() => {
     if (window.YT?.Player) { setYtReady(true); return; }
-    const existing = document.querySelector<HTMLScriptElement>('script[src="https://www.youtube.com/iframe_api"]');
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src="https://www.youtube.com/iframe_api"]',
+    );
     if (!existing) {
       const tag = document.createElement("script");
       tag.src = "https://www.youtube.com/iframe_api";
@@ -136,7 +135,8 @@ export default function ExercisePage() {
   useEffect(() => {
     getJson<PregnancyMeResponse>("/pregnancy/me")
       .then((data) => {
-        if (typeof data.max_allowed_bpm === "number") setMaxAllowedBpm(data.max_allowed_bpm);
+        if (typeof data.max_allowed_bpm === "number")
+          setMaxAllowedBpm(data.max_allowed_bpm);
       })
       .catch((e) => console.error("[pregnancy/me] 조회 실패:", e));
   }, []);
@@ -151,12 +151,18 @@ export default function ExercisePage() {
       videoId: toVideoId(current.videoUrl),
       playerVars: { controls: 0, rel: 0, modestbranding: 1, autoplay: 0 },
       events: {
-        onReady: (e: { target: YTPlayer }) => { setDuration(e.target.getDuration()); setPlayState("idle"); },
+        onReady: (e: { target: YTPlayer }) => {
+          setDuration(e.target.getDuration());
+          setPlayState("idle");
+        },
         onStateChange: (e: { data: number }) => {
           if (e.data === window.YT.PlayerState.ENDED) {
-            setPlayState("idle"); stopExerciseMode();
+            // ✅ 영상이 자연 종료됐을 때: API 성공 후 BLE 중지
+            setPlayState("idle");
             handleRecordEnd(current.id, () => {
               hasNextAvailableExercise ? goNext(current.id) : finishAll();
+            }).then((success) => {
+              if (success) stopExerciseMode();
             });
           }
         },
@@ -194,36 +200,71 @@ export default function ExercisePage() {
 
   const getActiveRecordId = () => getRecordId(current.id);
 
-  const handleRecordEnd = async (exerciseId: number, onDone: () => void) => {
+  // ✅ Fix 1: boolean 반환 + 중복 API 호출 제거 + API 성공 후 상태 업데이트
+  const handleRecordEnd = async (
+    exerciseId: number,
+    onDone: () => void,
+  ): Promise<boolean> => {
     const recordId = getRecordId(exerciseId);
-    if (recordId) {
-      try {
-        await postJson("/exercise/record/end", { record_id: recordId, heart_rates: getHeartRates() });
-        setEndedExerciseIds((prev) => prev.includes(Number(exerciseId)) ? prev : [...prev, Number(exerciseId)]);
-        onDone();
-      } catch (e) { console.error("[record/end] 실패:", e); }
+    if (!recordId) {
+      console.warn(
+        "[record/end] recordId 없음 - session.records:",
+        JSON.stringify(session?.records),
+      );
+      return false;
+    }
+    try {
+      await postJson("/exercise/record/end", {
+        record_id: recordId,
+        heart_rates: getHeartRates(),
+      });
+      // ✅ API 성공 확인 후 로컬 상태 정리
+      setEndedExerciseIds((prev) =>
+        prev.includes(Number(exerciseId)) ? prev : [...prev, Number(exerciseId)],
+      );
+      onDone();
+      return true;
+    } catch (e) {
+      console.error("[record/end] 실패:", e);
+      return false;
     }
   };
 
   const handleRecordPause = async () => {
     const recordId = getActiveRecordId();
     if (recordId) {
-      try { await postJson("/exercise/record/pause", { record_id: recordId }); }
-      catch (e) { console.error("[record/pause] 실패:", e); }
+      try {
+        await postJson("/exercise/record/pause", { record_id: recordId });
+      } catch (e) {
+        console.error("[record/pause] 실패:", e);
+      }
     }
   };
 
   const handleRecordResume = async () => {
     const recordId = getActiveRecordId();
     if (!recordId) return false;
-    try { await postJson("/exercise/record/resume", { record_id: recordId }); return true; }
-    catch (e) { console.error("[record/resume] 실패:", e); return false; }
+    try {
+      await postJson("/exercise/record/resume", { record_id: recordId });
+      return true;
+    } catch (e) {
+      console.error("[record/resume] 실패:", e);
+      return false;
+    }
   };
 
-  const handleSessionEnd = async () => {
+  const handleSessionEnd = async (): Promise<boolean> => {
     if (!session?.session_id) return false;
-    try { await postJson("/exercise/session/abort", { session_id: session.session_id, heart_rates: getHeartRates() }); return true; }
-    catch (e) { console.error("[session/abort] 실패:", e); return false; }
+    try {
+      await postJson("/exercise/session/abort", {
+        session_id: session.session_id,
+        heart_rates: getHeartRates(),
+      });
+      return true;
+    } catch (e) {
+      console.error("[session/abort] 실패:", e);
+      return false;
+    }
   };
 
   const goNext = (justEndedId?: number) => {
@@ -239,60 +280,108 @@ export default function ExercisePage() {
   };
 
   const hasNextAvailableExercise = exercises.some(
-    (ex) => Number(ex.id) !== Number(current?.id) && !endedExerciseIds.includes(Number(ex.id))
+    (ex) =>
+      Number(ex.id) !== Number(current?.id) &&
+      !endedExerciseIds.includes(Number(ex.id)),
   );
 
   const finishAll = () => {
     allowNavigationRef.current = true;
-    navigate("/report", { state: { exercises, sessionId: session?.session_id, heartRates: getSessionHeartRates() } });
+    navigate("/report", {
+      state: { exercises, sessionId: session?.session_id, heartRates: getSessionHeartRates() },
+    });
   };
 
   const handleStart = async () => {
     if (!isConnected) return;
     const success = await handleRecordResume();
     if (!success) return;
-    playerRef.current?.playVideo(); setPlayState("playing"); startExerciseMode();
+    playerRef.current?.playVideo();
+    setPlayState("playing");
+    startExerciseMode();
   };
 
   const handlePause = async () => {
-    playerRef.current?.pauseVideo(); setPlayState("paused"); pauseExerciseMode();
+    playerRef.current?.pauseVideo();
+    setPlayState("paused");
+    pauseExerciseMode();
     await handleRecordPause();
   };
 
   const handleResume = async () => {
     const success = await handleRecordResume();
     if (!success) return;
-    playerRef.current?.playVideo(); setPlayState("playing"); resumeExerciseMode();
+    playerRef.current?.playVideo();
+    setPlayState("playing");
+    resumeExerciseMode();
   };
 
-  const handleCurrentEnd = () => {
-    stopExerciseMode(); playerRef.current?.pauseVideo();
-    handleRecordEnd(current.id, () => { hasNextAvailableExercise ? goNext(current.id) : finishAll(); });
+  // ✅ Fix 2: 영상 일시정지 후 API 성공 확인 → BLE 중지, 실패 시 playState 원복
+  const handleCurrentEnd = async () => {
+    const prevState = playState;
+    playerRef.current?.pauseVideo();
+    setPlayState("idle");
+
+    const success = await handleRecordEnd(current.id, () => {
+      hasNextAvailableExercise ? goNext(current.id) : finishAll();
+    });
+
+    if (success) {
+      stopExerciseMode();
+    } else {
+      // 실패 시 UI 원복
+      setPlayState(prevState);
+      playerRef.current?.playVideo();
+    }
   };
 
+  // ✅ Fix 3: session/abort 성공 확인 후 BLE 중지 + navigate
   const handleStopConfirm = async () => {
-    stopExerciseMode(); setStopModal(false);
+    setStopModal(false);
     const success = await handleSessionEnd();
-    if (!success) return;
+    if (!success) {
+      setStopModal(true); // 실패 시 모달 재오픈
+      return;
+    }
+    stopExerciseMode();
     finishAll();
   };
 
+  // ✅ Fix 4: record/end 성공 확인 후 BLE 중지 + 운동 전환
   const handleSwitchConfirm = async () => {
     const target = switchModal.targetIndex;
     setSwitchModal({ open: false, targetIndex: 0 });
+
     if (playState === "playing" || playState === "paused") {
-      stopExerciseMode(); playerRef.current?.pauseVideo();
-      await handleRecordEnd(current.id, () => setCurrentIndex(target));
+      const prevState = playState;
+      playerRef.current?.pauseVideo();
+      setPlayState("idle");
+
+      const success = await handleRecordEnd(current.id, () => setCurrentIndex(target));
+      if (success) {
+        stopExerciseMode();
+      } else {
+        // 실패 시 UI 원복
+        setPlayState(prevState);
+        playerRef.current?.playVideo();
+      }
       return;
     }
     setCurrentIndex(target);
   };
 
+  // ✅ Fix 5: session/abort 성공 확인 후 BLE 중지 + navigate
   const handleLeaveConfirm = async () => {
-    stopExerciseMode(); playerRef.current?.pauseVideo(); setLeaveModal(false);
+    setLeaveModal(false);
     const success = await handleSessionEnd();
-    if (!success) return;
-    allowNavigationRef.current = true; navigate("/home");
+    if (!success) {
+      setLeaveModal(true); // 실패 시 모달 재오픈
+      return;
+    }
+    stopExerciseMode();
+    playerRef.current?.pauseVideo();
+    allowNavigationRef.current = true;
+    navigate("/home");
   };
 
   if (!current) return null;
@@ -302,14 +391,12 @@ export default function ExercisePage() {
 
   return (
     <>
-      {/* ── 오늘 안정 심박수 없으면 먼저 측정 ── */}
       <RestingHeartRateModal
         isOpen={showHRModal}
         onClose={() => setShowHRModal(false)}
         onSaved={() => { setHasTodayHR(true); setShowHRModal(false); }}
       />
 
-      {/* ── BLE 연결 모달 (심박 측정 완료 후에만 보임) ── */}
       {!showHRModal && (
         <DeviceConnection
           isOpen={!isConnected}
@@ -332,7 +419,9 @@ export default function ExercisePage() {
           <StatsRow>
             <StatCard>
               <StatLabel>남은 시간</StatLabel>
-              <StatValue>{duration > 0 ? formatTime(Math.max(duration - elapsed, 0)) : "--:--"}</StatValue>
+              <StatValue>
+                {duration > 0 ? formatTime(Math.max(duration - elapsed, 0)) : "--:--"}
+              </StatValue>
             </StatCard>
             <StatCard>
               <StatLabel>❤️ 심박수</StatLabel>
@@ -341,7 +430,9 @@ export default function ExercisePage() {
                 {isDisplayNumeric && <StatUnit>bpm</StatUnit>}
               </StatValue>
               {sensorState !== "ready" && (
-                <div style={{ fontSize: "12px", color: "#999" }}>센서를 손가락에 안정적으로 올려주세요</div>
+                <div style={{ fontSize: "12px", color: "#999" }}>
+                  센서를 손가락에 안정적으로 올려주세요
+                </div>
               )}
             </StatCard>
           </StatsRow>
@@ -405,7 +496,9 @@ export default function ExercisePage() {
             <ModalBody>
               <ModalEmoji>⚠️</ModalEmoji>
               <ModalTitle>운동을 종료할까요?</ModalTitle>
-              <ModalDesc>운동이 아직 남아있어요.{"\n"}지금 종료하면 리포트로 이동합니다.</ModalDesc>
+              <ModalDesc>
+                운동이 아직 남아있어요.{"\n"}지금 종료하면 리포트로 이동합니다.
+              </ModalDesc>
               <ModalButtons>
                 <ModalOutlineBtn onClick={() => setStopModal(false)}>계속할게요</ModalOutlineBtn>
                 <ModalFillBtn onClick={handleStopConfirm}>종료하기</ModalFillBtn>
@@ -413,7 +506,11 @@ export default function ExercisePage() {
             </ModalBody>
           </Modal>
 
-          <Modal isOpen={switchModal.open} onClose={() => setSwitchModal({ open: false, targetIndex: 0 })} showCloseButton={false}>
+          <Modal
+            isOpen={switchModal.open}
+            onClose={() => setSwitchModal({ open: false, targetIndex: 0 })}
+            showCloseButton={false}
+          >
             <ModalBody>
               <ModalTitle>다른 운동으로 이동할까요?</ModalTitle>
               <ModalDesc>
@@ -422,8 +519,12 @@ export default function ExercisePage() {
                 종료된 운동은 다시 실행할 수 없어요.
               </ModalDesc>
               <ModalButtons>
-                <ModalOutlineBtn onClick={() => setSwitchModal({ open: false, targetIndex: 0 })}>돌아가기</ModalOutlineBtn>
-                <ModalFillBtn onClick={handleSwitchConfirm}>{exercises[switchModal.targetIndex]?.title} 시작</ModalFillBtn>
+                <ModalOutlineBtn onClick={() => setSwitchModal({ open: false, targetIndex: 0 })}>
+                  돌아가기
+                </ModalOutlineBtn>
+                <ModalFillBtn onClick={handleSwitchConfirm}>
+                  {exercises[switchModal.targetIndex]?.title} 시작
+                </ModalFillBtn>
               </ModalButtons>
             </ModalBody>
           </Modal>
@@ -432,7 +533,9 @@ export default function ExercisePage() {
             <ModalBody>
               <ModalEmoji>⚠️</ModalEmoji>
               <ModalTitle>운동을 종료하고 나가시겠어요?</ModalTitle>
-              <ModalDesc>현재 운동 기록이 중단 처리됩니다.{"\n"}이동 후에는 이 운동 세션을 이어서 진행할 수 없어요.</ModalDesc>
+              <ModalDesc>
+                현재 운동 기록이 중단 처리됩니다.{"\n"}이동 후에는 이 운동 세션을 이어서 진행할 수 없어요.
+              </ModalDesc>
               <ModalButtons>
                 <ModalOutlineBtn onClick={() => setLeaveModal(false)}>계속 운동하기</ModalOutlineBtn>
                 <ModalFillBtn onClick={handleLeaveConfirm}>종료하고 나가기</ModalFillBtn>
@@ -445,7 +548,7 @@ export default function ExercisePage() {
   );
 }
 
-// ── Styled (기존과 동일) ───────────────────────────────────────
+// ── Styled ───────────────────────────────────────────────────
 const Container = styled.div`
   display: flex; flex-direction: column;
   height: 100%; overflow-y: auto; padding: 24px 16px 120px;
@@ -498,8 +601,8 @@ const ActionButton = styled.button<{ $variant?: "outline" | "danger" }>`
   ${({ $variant, theme }) => {
     switch ($variant) {
       case "outline": return `background:transparent;border:1.5px solid ${theme.colors.point};color:${theme.colors.point};&:hover{background:${theme.colors.light};}`;
-      case "danger":  return `background:${theme.colors.point};border:none;color:${theme.colors.white};&:hover{filter:brightness(0.92);}`;
-      default:        return `background:${theme.colors.light};border:1px solid ${theme.colors.point};color:${theme.colors.point};&:hover{background:${theme.colors.sub};}`;
+      case "danger": return `background:${theme.colors.point};border:none;color:${theme.colors.white};&:hover{filter:brightness(0.92);}`;
+      default: return `background:${theme.colors.light};border:1px solid ${theme.colors.point};color:${theme.colors.point};&:hover{background:${theme.colors.sub};}`;
     }
   }}
   &:disabled { opacity: 0.55; cursor: not-allowed; }

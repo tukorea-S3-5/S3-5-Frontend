@@ -1,4 +1,3 @@
-import { useState } from "react";
 import styled, { keyframes } from "styled-components";
 import CommentSection from "./CommentSection";
 

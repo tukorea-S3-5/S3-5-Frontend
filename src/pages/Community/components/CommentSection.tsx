@@ -1,6 +1,6 @@
-import { useState } from "react";
 import styled from "styled-components";
-import { postJson } from "../../../api/http";
+import { useState, useEffect } from "react";
+import { getJson, postJson } from "../../../api/http";
 
 export interface CommentItem {
   id: number;
@@ -18,6 +18,19 @@ export default function CommentSection({ postId }: Props) {
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const loadComments = async () => {
+      try {
+        const data = await getJson<CommentItem[]>(`/community/posts/${postId}/comments`);
+        setComments(data);
+      } catch (e) {
+        console.error("[CommentSection] 댓글 로드 실패:", e);
+      }
+    };
+    loadComments();
+  }, [postId]);
+
 
   const send = async () => {
     if (!input.trim() || busy) return;

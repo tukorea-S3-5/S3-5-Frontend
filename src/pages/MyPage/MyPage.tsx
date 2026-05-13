@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import ProfileSection from './components/ProfileSection';
 import PregnancyInfoCard from './components/PregnancyInfoCard';
 import HeartRateCard, { DailyHeartRate } from './components/HeartRateCard';
@@ -34,7 +33,6 @@ interface HeartRateRecord {
   bpm: number;
 }
 
-// ── 헬퍼 ──────────────────────────────────────────────────────
 const DAYS = ['월', '화', '수', '목', '금', '토', '오늘'] as const;
 
 function calcDDay(iso: string) {
@@ -54,7 +52,6 @@ function isToday(dateStr: string) {
 
 // ── Page ──────────────────────────────────────────────────────
 export default function MyPage() {
-  const navigate = useNavigate();
 
   const [user, setUser]             = useState<UserInfo | null>(null);
   const [pregnancy, setPregnancy]   = useState<PregnancyInfo | null>(null);
@@ -195,7 +192,7 @@ export default function MyPage() {
         <PostsTab posts={myPosts} likedPosts={[]} />
       </div>
 
-      {/* 오늘 심박 없을 때만 모달 */}
+      {/* 오늘 심박 없을 때 모달 */}
       <RestingHeartRateModal
         isOpen={showHRModal && !hasTodayHR}
         onClose={() => setShowHRModal(false)}
