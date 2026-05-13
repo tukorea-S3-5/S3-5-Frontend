@@ -24,7 +24,10 @@ export default function CommentSection({ postId }: Props) {
     setBusy(true);
     try {
       const newComment = await postJson("/community/comments", {
-        postId: Number(postId),
+const newComment = await postJson("/community/comments", {
+  postId,
+  content: input.trim(),
+}) as CommentItem;
         content: input.trim(),
       }) as CommentItem;
       setComments((prev) => [...prev, newComment]);
