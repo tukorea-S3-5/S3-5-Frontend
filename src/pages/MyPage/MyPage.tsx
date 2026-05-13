@@ -51,7 +51,9 @@ function isToday(dateStr: string) {
 }
 
 // ── Page ──────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────
 export default function MyPage() {
+  const navigate = useNavigate();
 
   const [user, setUser]             = useState<UserInfo | null>(null);
   const [pregnancy, setPregnancy]   = useState<PregnancyInfo | null>(null);
