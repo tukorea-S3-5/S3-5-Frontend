@@ -18,6 +18,7 @@ export default function CommentSection({ postId }: Props) {
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadComments = async () => {
@@ -37,16 +38,15 @@ export default function CommentSection({ postId }: Props) {
     setBusy(true);
     try {
       const newComment = await postJson("/community/comments", {
-const newComment = await postJson("/community/comments", {
-  postId,
-  content: input.trim(),
-}) as CommentItem;
+        postId,
         content: input.trim(),
       }) as CommentItem;
       setComments((prev) => [...prev, newComment]);
       setInput("");
+      setErrorMessage(null);
     } catch (e) {
       console.error("[CommentSection] 전송 실패:", e);
+      setErrorMessage("댓글 전송에 실패했습니다");
     } finally {
       setBusy(false);
     }
@@ -81,6 +81,7 @@ const newComment = await postJson("/community/comments", {
           </svg>
         </SendBtn>
       </InputRow>
+      {errorMessage && <ErrorMsg>{errorMessage}</ErrorMsg>}
     </Wrap>
   );
 }
@@ -95,3 +96,4 @@ const Text = styled.p`font-size: 13px; color: #2c1b1b; margin: 0;`;
 const InputRow = styled.div`display: flex; align-items: center; gap: 10px; background: #f6f6f6; border-radius: 999px; padding: 8px 14px 8px 8px;`;
 const TextBox = styled.input`flex: 1; border: none; outline: none; background: transparent; font-size: 13px; color: #2c1b1b; &::placeholder { color: #bfbfbf; }`;
 const SendBtn = styled.button`background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; color: #e88b8b; &:disabled { opacity: 0.4; cursor: not-allowed; }`;
+const ErrorMsg = styled.div`font-size: 12px; color: #d32f2f; padding: 4px 12px;`;
