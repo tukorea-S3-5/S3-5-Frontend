@@ -1,11 +1,11 @@
-import React from 'react';
-import styles from '../MyPage.module.css';
+import React from "react";
+import styles from "../MyPage.module.css";
 
 interface PregnancyInfoCardProps {
-  dueDate: string;           // "2026년 7월 20일"
-  dDay: number;              // 98
-  weeksLeft: number;         // 14
-  currentWeek: number;       // 26
+  dueDate: string; // "2026년 7월 20일"
+  dDay: number; // 98
+  weeksLeft: number; // 14
+  currentWeek: number; // 26
   onEdit?: () => void;
 }
 
