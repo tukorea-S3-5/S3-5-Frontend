@@ -20,7 +20,10 @@ export default function CommunityPage() {
       setLoading(true);
       const data = await getJson<PostItem[]>("/community/posts");
       if (data && data.length > 0) {
-        setPosts(data.map((p) => ({ ...p, isLiked: false })));
+        // ✅ Fix: 서버 응답의 isLiked 값을 우선 사용, 없으면 false로 폴백
+        // 백엔드가 isLiked를 내려주면 그 값을 그대로 쓰고,
+        // 아직 미지원이면 기존처럼 false로 초기화됨
+        setPosts(data.map((p) => ({ ...p, isLiked: p.isLiked ?? false })));
       }
     } catch (e) {
       console.error("[Community] 로드 실패:", e);
@@ -56,6 +59,7 @@ export default function CommunityPage() {
 
   // POST /community/posts/:id/like → { liked, likes }
   const toggleLike = async (postId: number) => {
+    // 낙관적 업데이트
     setPosts((prev) =>
       prev.map((p) =>
         p.id === postId
@@ -67,12 +71,14 @@ export default function CommunityPage() {
       const res = await postJson(`/community/posts/${postId}/like`, {}) as {
         liked: boolean; likes: number;
       };
+      // 서버 응답으로 정확한 상태 동기화
       setPosts((prev) =>
         prev.map((p) =>
           p.id === postId ? { ...p, isLiked: res.liked, likes: res.likes } : p
         )
       );
     } catch {
+      // 실패 시 낙관적 업데이트 원복
       setPosts((prev) =>
         prev.map((p) =>
           p.id === postId
@@ -155,7 +161,6 @@ const Hint = styled.p`
   font-size: 14px; color: #a8a8a8;
 `;
 
-/* 글쓰기 카드 */
 const WriteCard = styled.div`
   background: #fff;
   border: 1px solid #f4c9c2;

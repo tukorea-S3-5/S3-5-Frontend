@@ -51,16 +51,13 @@ function isToday(dateStr: string) {
 }
 
 // ── Page ──────────────────────────────────────────────────────
-// ── Page ──────────────────────────────────────────────────────
 export default function MyPage() {
-  const navigate = useNavigate();
-
-  const [user, setUser]             = useState<UserInfo | null>(null);
-  const [pregnancy, setPregnancy]   = useState<PregnancyInfo | null>(null);
-  const [weeklyHR, setWeeklyHR]     = useState<DailyHeartRate[]>(
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [pregnancy, setPregnancy] = useState<PregnancyInfo | null>(null);
+  const [weeklyHR, setWeeklyHR] = useState<DailyHeartRate[]>(
     DAYS.map((day) => ({ day, bpm: null }))
   );
-  const [myPosts, setMyPosts]       = useState<Post[]>([]);
+  const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [exerciseCount, setExerciseCount] = useState(0);
   const [showHRModal, setShowHRModal] = useState(false);
 
@@ -90,15 +87,22 @@ export default function MyPage() {
       const data = await getJson<HeartRateRecord[]>('/heartrate/weekly');
       const today = new Date();
 
+      // ✅ Fix: 이번 주 월요일을 기준점으로 고정한 뒤 i일씩 더함
+      // 기존 코드는 평일에 실행하면 i가 커질수록 미래 날짜가 되는 버그가 있었음
+      // 예) 월요일(dow=1)에 실행: i=1(화) → today+1(내일), i=5(토) → today+5(5일 후)
+      const monday = new Date(today);
+      const dow = today.getDay() === 0 ? 7 : today.getDay(); // 일요일=0 → 7로 변환
+      monday.setDate(today.getDate() - dow + 1); // 이번 주 월요일
+      monday.setHours(0, 0, 0, 0);
+
       const mapped: DailyHeartRate[] = DAYS.map((day, i) => {
         if (day === '오늘') {
           const rec = data.find((r) => isToday(r.date));
           return { day, bpm: rec?.bpm ?? null };
         }
-        // 이번 주 월~토 날짜 계산
-        const target = new Date(today);
-        const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
-        target.setDate(today.getDate() - dayOfWeek + i + 1);
+        // i=0: 월, i=1: 화, ..., i=5: 토 → 항상 이번 주 과거/현재 날짜
+        const target = new Date(monday);
+        target.setDate(monday.getDate() + i);
         const rec = data.find(
           (r) => new Date(r.date).toDateString() === target.toDateString()
         );
@@ -188,7 +192,7 @@ export default function MyPage() {
           weeklyData={weeklyHR}
           weeklyAvg={weeklyAvg}
           hasTodayData={hasTodayHR}
-          onMeasure={() => setShowHRModal(true)} // 모달 오픈
+          onMeasure={() => setShowHRModal(true)}
         />
 
         <PostsTab posts={myPosts} likedPosts={[]} />

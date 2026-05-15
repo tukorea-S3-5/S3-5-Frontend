@@ -95,20 +95,17 @@ export default function ExercisePage() {
   const [switchModal, setSwitchModal] = useState<{ open: boolean; targetIndex: number }>({ open: false, targetIndex: 0 });
   const [maxAllowedBpm, setMaxAllowedBpm] = useState<number | null>(null);
 
-  const [hasTodayHR, setHasTodayHR] = useState<boolean | null>(null);
   const [showHRModal, setShowHRModal] = useState(false);
 
   useEffect(() => {
     getJson<HeartRateRecord[]>("/heartrate/weekly")
       .then((data) => {
-        const todayRec = data.find(
+        const hasToday = data.some(
           (r) => new Date(r.date).toDateString() === new Date().toDateString(),
         );
-        const has = !!todayRec;
-        setHasTodayHR(has);
-        if (!has) setShowHRModal(true);
+        if (!hasToday) setShowHRModal(true);
       })
-      .catch(() => setHasTodayHR(true));
+      .catch(() => { }); // 실패 시 모달 띄우지 않음 (막지 않음)
   }, []);
 
   const current = exercises[currentIndex];
