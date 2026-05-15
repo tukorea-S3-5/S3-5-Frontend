@@ -1,74 +1,209 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import ProfileSection from './components/ProfileSection';
 import PregnancyInfoCard from './components/PregnancyInfoCard';
 import HeartRateCard, { DailyHeartRate } from './components/HeartRateCard';
 import PostsTab from './components/PostsTab';
+import RestingHeartRateModal from '../../components/RestingHeartRateModal';
 import styles from './MyPage.module.css';
+import { getJson } from '../../api/http';
 
-// TODO: 실제 API 연동 시 아래 mock 데이터를 교체하세요
-const MOCK_WEEKLY_HR: DailyHeartRate[] = [
-  { day: '월', bpm: 72 },
-  { day: '화', bpm: 75 },
-  { day: '수', bpm: 70 },
-  { day: '목', bpm: 73 },
-  { day: '금', bpm: 71 },
-  { day: '토', bpm: 69 },
-  { day: '오늘', bpm: null }, // 오늘 데이터 없으면 null
-];
+// ── 타입 ──────────────────────────────────────────────────────
+interface PregnancyInfo {
+  due_date: string;
+  current_week: number;
+}
 
-const MyPage: React.FC = () => {
-  const [hasTodayHR, setHasTodayHR] = useState(false);
+interface UserInfo {
+  user_id: string;
+  nickname: string;
+}
 
-  // 오늘 심박수 데이터 존재 여부 확인
-  useEffect(() => {
-    const today = MOCK_WEEKLY_HR.find((d) => d.day === '오늘');
-    setHasTodayHR(today?.bpm !== null);
+interface Post {
+  id: number;
+  title: string;
+  content: string;
+  createdAt: string;
+  likes: number;
+  userId: string;
+  user: UserInfo;
+}
+
+interface HeartRateRecord {
+  date: string;
+  bpm: number;
+}
+
+const DAYS = ['월', '화', '수', '목', '금', '토', '오늘'] as const;
+
+function calcDDay(iso: string) {
+  const diff = new Date(iso).getTime() - Date.now();
+  const dDay = Math.ceil(diff / 86400000);
+  return { dDay, weeksLeft: Math.floor(dDay / 7) };
+}
+
+function formatDueDate(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+function isToday(dateStr: string) {
+  return new Date(dateStr).toDateString() === new Date().toDateString();
+}
+
+// ── Page ──────────────────────────────────────────────────────
+export default function MyPage() {
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [pregnancy, setPregnancy] = useState<PregnancyInfo | null>(null);
+  const [weeklyHR, setWeeklyHR] = useState<DailyHeartRate[]>(
+    DAYS.map((day) => ({ day, bpm: null }))
+  );
+  const [myPosts, setMyPosts] = useState<Post[]>([]);
+  const [exerciseCount, setExerciseCount] = useState(0);
+  const [showHRModal, setShowHRModal] = useState(false);
+
+  // ── 유저 정보: GET /user/me ───────────────────────────────
+  const loadUser = useCallback(async () => {
+    try {
+      const data = await getJson<UserInfo>('/user/me');
+      setUser(data);
+    } catch (e) {
+      console.error('[MyPage] 유저 정보 로드 실패:', e);
+    }
   }, []);
 
+  // ── 임신 정보: GET /pregnancy/me ─────────────────────────
+  const loadPregnancy = useCallback(async () => {
+    try {
+      const data = await getJson<PregnancyInfo>('/pregnancy/me');
+      setPregnancy(data);
+    } catch (e) {
+      console.error('[MyPage] 임신 정보 로드 실패:', e);
+    }
+  }, []);
+
+  // ── 주간 심박수: GET /heartrate/weekly ───────────────────
+  const loadHeartRate = useCallback(async () => {
+    try {
+      const data = await getJson<HeartRateRecord[]>('/heartrate/weekly');
+      const today = new Date();
+
+      // ✅ Fix: 이번 주 월요일을 기준점으로 고정한 뒤 i일씩 더함
+      // 기존 코드는 평일에 실행하면 i가 커질수록 미래 날짜가 되는 버그가 있었음
+      // 예) 월요일(dow=1)에 실행: i=1(화) → today+1(내일), i=5(토) → today+5(5일 후)
+      const monday = new Date(today);
+      const dow = today.getDay() === 0 ? 7 : today.getDay(); // 일요일=0 → 7로 변환
+      monday.setDate(today.getDate() - dow + 1); // 이번 주 월요일
+      monday.setHours(0, 0, 0, 0);
+
+      const mapped: DailyHeartRate[] = DAYS.map((day, i) => {
+        if (day === '오늘') {
+          const rec = data.find((r) => isToday(r.date));
+          return { day, bpm: rec?.bpm ?? null };
+        }
+        // i=0: 월, i=1: 화, ..., i=5: 토 → 항상 이번 주 과거/현재 날짜
+        const target = new Date(monday);
+        target.setDate(monday.getDate() + i);
+        const rec = data.find(
+          (r) => new Date(r.date).toDateString() === target.toDateString()
+        );
+        return { day, bpm: rec?.bpm ?? null };
+      });
+
+      setWeeklyHR(mapped);
+    } catch (e) {
+      console.error('[MyPage] 심박수 로드 실패:', e);
+    }
+  }, []);
+
+  // ── 내 게시물: GET /community/posts → userId 필터 ────────
+  const loadPosts = useCallback(async () => {
+    if (!user) return;
+    try {
+      const all = await getJson<Post[]>('/community/posts');
+      setMyPosts(all.filter((p) => p.userId === user.user_id));
+    } catch (e) {
+      console.error('[MyPage] 게시물 로드 실패:', e);
+    }
+  }, [user]);
+
+  // ── 운동 횟수: GET /exercise/session/count ───────────────
+  const loadExerciseCount = useCallback(async () => {
+    try {
+      const data = await getJson<{ count: number }>('/exercise/session/count');
+      setExerciseCount(data.count);
+    } catch (e) {
+      console.error('[MyPage] 운동 횟수 로드 실패:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUser();
+    loadPregnancy();
+    loadHeartRate();
+    loadExerciseCount();
+  }, [loadUser, loadPregnancy, loadHeartRate, loadExerciseCount]);
+
+  useEffect(() => { loadPosts(); }, [loadPosts]);
+
+  // ── 파생값 ────────────────────────────────────────────────
+  const hasTodayHR = weeklyHR.find((d) => d.day === '오늘')?.bpm !== null;
+
   const weeklyAvg = (() => {
-    const valid = MOCK_WEEKLY_HR.filter((d) => d.bpm !== null).map((d) => d.bpm as number);
-    if (valid.length === 0) return null;
+    const valid = weeklyHR
+      .filter((d) => d.bpm !== null)
+      .map((d) => d.bpm as number);
+    if (!valid.length) return null;
     return Math.round(valid.reduce((a, b) => a + b, 0) / valid.length);
   })();
 
-  const handleMeasure = () => {
-    // TODO: 운동 시작 전 1분 심박 측정 화면으로 이동
-    console.log('측정하기 클릭');
+  const { dDay, weeksLeft } = pregnancy
+    ? calcDDay(pregnancy.due_date)
+    : { dDay: 0, weeksLeft: 0 };
+
+  // 측정 완료 후 심박수 카드 새로고침
+  const handleHRSaved = (bpm: number) => {
+    setWeeklyHR((prev) =>
+      prev.map((d) => (d.day === '오늘' ? { ...d, bpm } : d))
+    );
+    setShowHRModal(false);
   };
 
   return (
     <div className={styles.page}>
-      {/* 프로필 */}
       <ProfileSection
-        name="홍길동"
+        name={user?.nickname ?? ''}
         handle="@me"
-        postCount={0}
-        likeCount={1}
-        exerciseCount={12}
+        postCount={myPosts.length}
+        likeCount={0}
+        exerciseCount={exerciseCount}
       />
 
       <div className={styles.scrollContent}>
-        {/* 임신 정보 */}
-        <PregnancyInfoCard
-          dueDate="2026년 7월 20일"
-          dDay={98}
-          weeksLeft={14}
-          currentWeek={26}
-        />
+        {pregnancy && (
+          <PregnancyInfoCard
+            dueDate={formatDueDate(pregnancy.due_date)}
+            dDay={dDay}
+            weeksLeft={weeksLeft}
+            currentWeek={pregnancy.current_week}
+          />
+        )}
 
-        {/* 평소 심박수 */}
         <HeartRateCard
-          weeklyData={MOCK_WEEKLY_HR}
+          weeklyData={weeklyHR}
           weeklyAvg={weeklyAvg}
           hasTodayData={hasTodayHR}
-          onMeasure={handleMeasure}
+          onMeasure={() => setShowHRModal(true)}
         />
 
-        {/* 게시물 */}
-        <PostsTab posts={[]} likedPosts={[]} />
+        <PostsTab posts={myPosts} likedPosts={[]} />
       </div>
+
+      {/* 오늘 심박 없을 때 모달 */}
+      <RestingHeartRateModal
+        isOpen={showHRModal && !hasTodayHR}
+        onClose={() => setShowHRModal(false)}
+        onSaved={handleHRSaved}
+      />
     </div>
   );
-};
-
-export default MyPage;
+}

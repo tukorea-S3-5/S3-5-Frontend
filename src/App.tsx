@@ -20,6 +20,7 @@ import ReportPage from "./pages/Exercise/ReportPage";
 import PregnancyOnboardingPage from "./pages/PregnancyOnboarding/PregnancyOnboardingPage";
 import ExerciseListPage from "./pages/ExerciseList/ExerciseListPage";
 import MyPage from "./pages/MyPage";
+import CommunityPage from "./pages/Community/CommunityPage";
 
 function App() {
   return (
@@ -104,6 +105,8 @@ function AppRoutes() {
           <Route path="exercises" element={<ExerciseListPage />} />
           <Route path="exercise" element={<ExercisePage />} />
           <Route path="report" element={<ReportPage />} />
+          <Route path="community" element={<CommunityPage />} />
+          
 
           <Route
             path="record"

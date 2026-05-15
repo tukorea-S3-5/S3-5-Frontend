@@ -16,7 +16,7 @@ const defaultItems: NavItemType[] = [
   { path: "/home", label: "홈", icon: "🏠" },
   { path: "/exercises", label: "운동", icon: "💪" },
   { path: "/weight", label: "체중", icon: "⚖️" },
-  { path: "/postnatal", label: "산후", icon: "😊" },
+  { path: "/community", label: "커뮤니티", icon: "💬" },
 ];
 
 const BottomNav: React.FC<BottomNavProps> = ({ items = defaultItems }) => {
@@ -29,13 +29,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ items = defaultItems }) => {
         <NavItem
           key={item.path}
           $active={location.pathname === item.path}
-          onClick={() => {
-            navigate(item.path);
-
-            if (item.path === '/postnatal') {
-              alert('해당 기능은 아직 준비중이에요 🥲');
-            }
-          }}
+          onClick={() => navigate(item.path)}
         >
           <NavIcon>{item.icon}</NavIcon>
           <NavLabel $active={location.pathname === item.path}>{item.label}</NavLabel>
