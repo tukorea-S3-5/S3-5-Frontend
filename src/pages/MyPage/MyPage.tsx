@@ -1,16 +1,16 @@
-import { useEffect, useState, useCallback } from 'react';
-import ProfileSection from './components/ProfileSection';
-import PregnancyInfoCard from './components/PregnancyInfoCard';
-import HeartRateCard, { DailyHeartRate } from './components/HeartRateCard';
-import PostsTab from './components/PostsTab';
-import RestingHeartRateModal from '../../components/RestingHeartRateModal';
-import styles from './MyPage.module.css';
-import { getJson } from '../../api/http';
+import { useEffect, useState, useCallback } from "react";
+import ProfileSection from "./components/ProfileSection";
+import PregnancyInfoCard from "./components/PregnancyInfoCard";
+import HeartRateCard, { DailyHeartRate } from "./components/HeartRateCard";
+import PostsTab from "./components/PostsTab";
+import RestingHeartRateModal from "../../components/RestingHeartRateModal";
+import styles from "./MyPage.module.css";
+import { getJson } from "../../api/http";
 
 // ── 타입 ──────────────────────────────────────────────────────
 interface PregnancyInfo {
   due_date: string;
-  current_week: number;
+  week: number;
 }
 
 interface UserInfo {
@@ -33,7 +33,14 @@ interface HeartRateRecord {
   bpm: number;
 }
 
-const DAYS = ['월', '화', '수', '목', '금', '토', '오늘'] as const;
+interface ExerciseHistoryResponse {
+  sessions: {
+    session_id: number;
+    status: string;
+  }[];
+}
+
+const DAYS = ["월", "화", "수", "목", "금", "토", "오늘"] as const;
 
 function calcDDay(iso: string) {
   const diff = new Date(iso).getTime() - Date.now();
@@ -55,7 +62,7 @@ export default function MyPage() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [pregnancy, setPregnancy] = useState<PregnancyInfo | null>(null);
   const [weeklyHR, setWeeklyHR] = useState<DailyHeartRate[]>(
-    DAYS.map((day) => ({ day, bpm: null }))
+    DAYS.map((day) => ({ day, bpm: null })),
   );
   const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [exerciseCount, setExerciseCount] = useState(0);
@@ -64,27 +71,27 @@ export default function MyPage() {
   // ── 유저 정보: GET /user/me ───────────────────────────────
   const loadUser = useCallback(async () => {
     try {
-      const data = await getJson<UserInfo>('/user/me');
+      const data = await getJson<UserInfo>("/user/me");
       setUser(data);
     } catch (e) {
-      console.error('[MyPage] 유저 정보 로드 실패:', e);
+      console.error("[MyPage] 유저 정보 로드 실패:", e);
     }
   }, []);
 
   // ── 임신 정보: GET /pregnancy/me ─────────────────────────
   const loadPregnancy = useCallback(async () => {
     try {
-      const data = await getJson<PregnancyInfo>('/pregnancy/me');
+      const data = await getJson<PregnancyInfo>("/pregnancy/me");
       setPregnancy(data);
     } catch (e) {
-      console.error('[MyPage] 임신 정보 로드 실패:', e);
+      console.error("[MyPage] 임신 정보 로드 실패:", e);
     }
   }, []);
 
   // ── 주간 심박수: GET /heartrate/weekly ───────────────────
   const loadHeartRate = useCallback(async () => {
     try {
-      const data = await getJson<HeartRateRecord[]>('/heartrate/weekly');
+      const data = await getJson<HeartRateRecord[]>("/heartrate/weekly");
       const today = new Date();
 
       // ✅ Fix: 이번 주 월요일을 기준점으로 고정한 뒤 i일씩 더함
@@ -96,7 +103,7 @@ export default function MyPage() {
       monday.setHours(0, 0, 0, 0);
 
       const mapped: DailyHeartRate[] = DAYS.map((day, i) => {
-        if (day === '오늘') {
+        if (day === "오늘") {
           const rec = data.find((r) => isToday(r.date));
           return { day, bpm: rec?.bpm ?? null };
         }
@@ -104,14 +111,14 @@ export default function MyPage() {
         const target = new Date(monday);
         target.setDate(monday.getDate() + i);
         const rec = data.find(
-          (r) => new Date(r.date).toDateString() === target.toDateString()
+          (r) => new Date(r.date).toDateString() === target.toDateString(),
         );
         return { day, bpm: rec?.bpm ?? null };
       });
 
       setWeeklyHR(mapped);
     } catch (e) {
-      console.error('[MyPage] 심박수 로드 실패:', e);
+      console.error("[MyPage] 심박수 로드 실패:", e);
     }
   }, []);
 
@@ -119,20 +126,20 @@ export default function MyPage() {
   const loadPosts = useCallback(async () => {
     if (!user) return;
     try {
-      const all = await getJson<Post[]>('/community/posts');
+      const all = await getJson<Post[]>("/community/posts");
       setMyPosts(all.filter((p) => p.userId === user.user_id));
     } catch (e) {
-      console.error('[MyPage] 게시물 로드 실패:', e);
+      console.error("[MyPage] 게시물 로드 실패:", e);
     }
   }, [user]);
 
-  // ── 운동 횟수: GET /exercise/session/count ───────────────
+  // ── 운동 횟수: GET /exercise/history ───────────────
   const loadExerciseCount = useCallback(async () => {
     try {
-      const data = await getJson<{ count: number }>('/exercise/session/count');
-      setExerciseCount(data.count);
+      const data = await getJson<ExerciseHistoryResponse>("/exercise/history");
+      setExerciseCount(data.sessions.length);
     } catch (e) {
-      console.error('[MyPage] 운동 횟수 로드 실패:', e);
+      console.error("[MyPage] 운동 횟수 로드 실패:", e);
     }
   }, []);
 
@@ -143,10 +150,12 @@ export default function MyPage() {
     loadExerciseCount();
   }, [loadUser, loadPregnancy, loadHeartRate, loadExerciseCount]);
 
-  useEffect(() => { loadPosts(); }, [loadPosts]);
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
 
   // ── 파생값 ────────────────────────────────────────────────
-  const hasTodayHR = weeklyHR.find((d) => d.day === '오늘')?.bpm !== null;
+  const hasTodayHR = weeklyHR.find((d) => d.day === "오늘")?.bpm !== null;
 
   const weeklyAvg = (() => {
     const valid = weeklyHR
@@ -163,7 +172,7 @@ export default function MyPage() {
   // 측정 완료 후 심박수 카드 새로고침
   const handleHRSaved = (bpm: number) => {
     setWeeklyHR((prev) =>
-      prev.map((d) => (d.day === '오늘' ? { ...d, bpm } : d))
+      prev.map((d) => (d.day === "오늘" ? { ...d, bpm } : d)),
     );
     setShowHRModal(false);
   };
@@ -171,7 +180,7 @@ export default function MyPage() {
   return (
     <div className={styles.page}>
       <ProfileSection
-        name={user?.nickname ?? ''}
+        name={user?.nickname ?? ""}
         handle="@me"
         postCount={myPosts.length}
         likeCount={0}
@@ -184,7 +193,7 @@ export default function MyPage() {
             dueDate={formatDueDate(pregnancy.due_date)}
             dDay={dDay}
             weeksLeft={weeksLeft}
-            currentWeek={pregnancy.current_week}
+            currentWeek={pregnancy.week}
           />
         )}
 
