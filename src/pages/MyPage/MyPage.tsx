@@ -5,12 +5,16 @@ import HeartRateCard, { DailyHeartRate } from "./components/HeartRateCard";
 import PostsTab from "./components/PostsTab";
 import RestingHeartRateModal from "../../components/RestingHeartRateModal";
 import styles from "./MyPage.module.css";
-import { getJson } from "../../api/http";
+import { getJson, putJson } from "../../api/http";
+import NameEditModal from "./components/NameEditModal";
+import PregnancyEditModal from "./components/PregnancyEditModal";
 
 // ── 타입 ──────────────────────────────────────────────────────
 interface PregnancyInfo {
   due_date: string;
   week: number;
+  pre_weight?: number;
+  is_multiple?: boolean;
 }
 
 interface UserInfo {
@@ -90,6 +94,13 @@ export default function MyPage() {
   const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [exerciseCount, setExerciseCount] = useState(0);
   const [showHRModal, setShowHRModal] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [isEditingPregnancy, setIsEditingPregnancy] = useState(false);
+  const [preWeightInput, setPreWeightInput] = useState(0);
+  const [dueDateInput, setDueDateInput] = useState("");
+  const [isMultipleInput, setIsMultipleInput] = useState(false);
+  const [isSavingPregnancy, setIsSavingPregnancy] = useState(false);
 
   // ── 유저 정보: GET /user/me ───────────────────────────────
   const loadUser = useCallback(async () => {
@@ -202,6 +213,52 @@ export default function MyPage() {
     setShowHRModal(false);
   };
 
+  const handleOpenNameEdit = () => {
+    setNameInput(user?.name ?? "");
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    try {
+      const updatedUser = await putJson<UserInfo>("/user/me", {
+        name: nameInput.trim(),
+      });
+
+      setUser(updatedUser);
+      setIsEditingName(false);
+    } catch (e) {
+      console.error("[MyPage] 이름 수정 실패:", e);
+    }
+  };
+
+  const handleOpenPregnancyEdit = () => {
+    setPreWeightInput(pregnancy?.pre_weight ?? 0);
+    setDueDateInput(pregnancy?.due_date?.slice(0, 10) ?? "");
+    setIsMultipleInput(pregnancy?.is_multiple ?? false);
+    setIsEditingPregnancy(true);
+  };
+
+  const handleSavePregnancy = async () => {
+    if (!dueDateInput || isSavingPregnancy) return;
+
+    try {
+      setIsSavingPregnancy(true);
+
+      const updatedPregnancy = await putJson<PregnancyInfo>("/pregnancy/me", {
+        pre_weight: preWeightInput,
+        due_date: dueDateInput,
+        is_multiple: isMultipleInput,
+      });
+
+      setPregnancy(updatedPregnancy);
+      setIsEditingPregnancy(false);
+    } catch (e) {
+      console.error("[MyPage] 임신 정보 수정 실패:", e);
+    } finally {
+      setIsSavingPregnancy(false);
+    }
+  };
+
   return (
     <div className={styles.page}>
       <ProfileSection
@@ -210,16 +267,20 @@ export default function MyPage() {
         postCount={myPosts.length}
         likeCount={likedPosts.length}
         exerciseCount={exerciseCount}
+        onEditProfile={handleOpenNameEdit}
       />
 
       <div className={styles.scrollContent}>
         {pregnancy && (
-          <PregnancyInfoCard
-            dueDate={formatDueDate(pregnancy.due_date)}
-            dDay={dDay}
-            weeksLeft={weeksLeft}
-            currentWeek={pregnancy.week}
-          />
+          <div>
+            <PregnancyInfoCard
+              dueDate={formatDueDate(pregnancy.due_date)}
+              dDay={dDay}
+              weeksLeft={weeksLeft}
+              currentWeek={pregnancy.week}
+              onEdit={handleOpenPregnancyEdit}
+            />
+          </div>
         )}
 
         <HeartRateCard
@@ -231,6 +292,28 @@ export default function MyPage() {
 
         <PostsTab posts={myPosts} likedPosts={likedPosts} />
       </div>
+
+      <NameEditModal
+        isOpen={isEditingName}
+        value={nameInput}
+        isSaving={false}
+        onChange={setNameInput}
+        onClose={() => setIsEditingName(false)}
+        onSave={handleSaveName}
+      />
+
+      <PregnancyEditModal
+        isOpen={isEditingPregnancy}
+        preWeight={preWeightInput}
+        dueDate={dueDateInput}
+        isMultiple={isMultipleInput}
+        isSaving={isSavingPregnancy}
+        onPreWeightChange={setPreWeightInput}
+        onDueDateChange={setDueDateInput}
+        onIsMultipleChange={setIsMultipleInput}
+        onClose={() => setIsEditingPregnancy(false)}
+        onSave={handleSavePregnancy}
+      />
 
       {/* 오늘 심박 없을 때 모달 */}
       <RestingHeartRateModal

@@ -69,7 +69,7 @@ export default function RestingHeartRateModal({
     setStep("done");
     if (avg) {
       setSaving(true);
-      postJson("/heart-rate/resting", { bpm: avg })
+      postJson("/heart-rate/resting", { restingHeartRate: avg })
         .then(() => onSaved?.(avg))
         .catch((e) => console.error("[RestingHR] 저장 실패:", e))
         .finally(() => setSaving(false));

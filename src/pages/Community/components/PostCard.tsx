@@ -1,5 +1,5 @@
+import { useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
-import CommentSection from "./CommentSection";
 import likeIcon from "@assets/icons/like.svg";
 import likeFilledIcon from "@assets/icons/like_filled.svg";
 import commentIcon from "@assets/icons/comment.svg";
@@ -10,11 +10,12 @@ export interface PostItem {
   content: string;
   createdAt: string;
   likes: number;
+  commentsCount?: number;
   userId: string;
   user: {
     user_id: string;
     name: string;
-    profileImage: string;
+    profileImage?: string | null;
   };
   isLiked?: boolean;
 }
@@ -23,22 +24,25 @@ interface Props {
   post: PostItem;
   delay?: number;
   onToggleLike: (id: number) => Promise<void>;
-}
-
-function timeAgo(iso: string) {
-  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (min < 1) return "방금 전";
-  if (min < 60) return `${min}분 전`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h}시간 전`;
-  return `${Math.floor(h / 24)}일 전`;
+  profileImage?: string | null;
 }
 
 export default function PostCard({ post, delay = 0, onToggleLike }: Props) {
+  const navigate = useNavigate();
+  const goDetail = () => navigate(`/community/posts/${post.id}`);
+
+  const commentCount = post.commentsCount ?? 0;
   return (
-    <Card $delay={delay}>
+    <Card $delay={delay} onClick={goDetail}>
       <AuthorRow>
-        <Avatar />
+        <Avatar>
+          {post.user?.profileImage ? (
+            <AvatarImage
+              src={post.user.profileImage}
+              alt={`${post.user?.name ?? "사용자"} 프로필 이미지`}
+            />
+          ) : null}
+        </Avatar>
         <AuthorMeta>
           <AuthorName>{post.user?.name ?? post.userId}</AuthorName>
           <TimeText>{timeAgo(post.createdAt)}</TimeText>
@@ -51,17 +55,25 @@ export default function PostCard({ post, delay = 0, onToggleLike }: Props) {
       <Divider />
 
       <ActionsRow>
-        <ActionBtn onClick={() => onToggleLike(post.id)}>
+        <ActionBtn
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleLike(post.id);
+          }}
+        >
           <LikeIcon $active={!!post.isLiked} />
           <ActionCount $active={!!post.isLiked}>{post.likes}</ActionCount>
         </ActionBtn>
-        <ActionBtn>
+        <ActionBtn
+          onClick={(e) => {
+            e.stopPropagation();
+            goDetail();
+          }}
+        >
           <CommentIcon />
+          <ActionCount $active={false}>{commentCount}</ActionCount>
         </ActionBtn>
       </ActionsRow>
-
-      <Divider style={{ marginTop: 10 }} />
-      <CommentSection postId={post.id} />
     </Card>
   );
 }
@@ -78,6 +90,7 @@ const Card = styled.div<{ $delay: number }>`
   box-shadow: 0 2px 8px rgba(232, 139, 139, 0.08);
   animation: ${fadeIn} 0.3s ease both;
   animation-delay: ${(p) => p.$delay}ms;
+  cursor: pointer;
 `;
 const AuthorRow = styled.div`
   display: flex;
@@ -91,6 +104,15 @@ const Avatar = styled.div`
   border-radius: 50%;
   background: #d9d9d9;
   flex-shrink: 0;
+  overflow: hidden;
+`;
+
+const AvatarImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
 `;
 const AuthorMeta = styled.div`
   display: flex;
@@ -155,3 +177,25 @@ const LikeIcon = ({ $active }: { $active: boolean }) => (
 );
 
 const CommentIcon = () => <IconImage src={commentIcon} alt="댓글" />;
+
+function timeAgo(iso: string) {
+  const now = new Date();
+  const target = new Date(iso);
+  const min = Math.floor((now.getTime() - target.getTime()) / 60000);
+
+  if (min < 1) return "방금 전";
+  if (min < 60) return `${min}분 전`;
+
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}시간 전`;
+
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}일 전`;
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(target);
+}

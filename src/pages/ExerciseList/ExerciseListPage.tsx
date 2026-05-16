@@ -287,7 +287,7 @@ const EmptyText = styled.p`
 
 const ButtonArea = styled.div`
   position: fixed;
-  bottom: 80px;
+  bottom: 90px;
   left: 50%;
   transform: translateX(-50%);
   max-width: 430px;

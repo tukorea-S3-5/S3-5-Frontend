@@ -1,5 +1,6 @@
 import React from "react";
 import styles from "../MyPage.module.css";
+import { PencilIcon, CameraIcon } from "lucide-react";
 
 interface ProfileSectionProps {
   name: string;
@@ -8,6 +9,7 @@ interface ProfileSectionProps {
   likeCount: number;
   exerciseCount: number;
   onEditProfile?: () => void;
+  onChangeProfileImage?: () => void;
 }
 
 const ProfileSection: React.FC<ProfileSectionProps> = ({
@@ -17,6 +19,7 @@ const ProfileSection: React.FC<ProfileSectionProps> = ({
   likeCount,
   exerciseCount,
   onEditProfile,
+  onChangeProfileImage,
 }) => {
   const initial = name.charAt(0);
   const hasProfileImage = Boolean(profileImage);
@@ -37,19 +40,25 @@ const ProfileSection: React.FC<ProfileSectionProps> = ({
               initial
             )}
           </div>
-          <button className={styles.cameraBtn} aria-label="프로필 사진 변경">
-            📷
+          <button
+            type="button"
+            className={styles.cameraBtn}
+            onClick={onChangeProfileImage}
+            aria-label="프로필 사진 변경"
+          >
+            <CameraIcon size={12} strokeWidth={2} />
           </button>
         </div>
         <div className={styles.profileInfo}>
           <div className={styles.profileName}>
             {name}
             <button
+              type="button"
               className={styles.editBtn}
               onClick={onEditProfile}
               aria-label="이름 수정"
             >
-              ✏️
+              <PencilIcon size={15} strokeWidth={2} />
             </button>
           </div>
         </div>
