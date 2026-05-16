@@ -1,9 +1,9 @@
-import React from 'react';
-import styles from '../MyPage.module.css';
+import React from "react";
+import styles from "../MyPage.module.css";
 
 interface ProfileSectionProps {
   name: string;
-  handle: string;
+  profileImage?: string | null;
   postCount: number;
   likeCount: number;
   exerciseCount: number;
@@ -12,30 +12,46 @@ interface ProfileSectionProps {
 
 const ProfileSection: React.FC<ProfileSectionProps> = ({
   name,
-  handle,
+  profileImage,
   postCount,
   likeCount,
   exerciseCount,
   onEditProfile,
 }) => {
   const initial = name.charAt(0);
+  const hasProfileImage = Boolean(profileImage);
 
   return (
     <div className={styles.profileSection}>
       {/* Avatar */}
       <div className={styles.profileRow}>
         <div className={styles.avatarWrapper}>
-          <div className={styles.avatar}>{initial}</div>
-          <button className={styles.cameraBtn} aria-label="프로필 사진 변경">📷</button>
+          <div className={styles.avatar}>
+            {hasProfileImage ? (
+              <img
+                src={profileImage ?? ""}
+                alt={`${name} 프로필 이미지`}
+                className={styles.avatarImage}
+              />
+            ) : (
+              initial
+            )}
+          </div>
+          <button className={styles.cameraBtn} aria-label="프로필 사진 변경">
+            📷
+          </button>
         </div>
         <div className={styles.profileInfo}>
           <div className={styles.profileName}>
             {name}
-            <button className={styles.editBtn} onClick={onEditProfile} aria-label="이름 수정">
+            <button
+              className={styles.editBtn}
+              onClick={onEditProfile}
+              aria-label="이름 수정"
+            >
               ✏️
             </button>
           </div>
-          <div className={styles.profileHandle}>{handle}</div>
         </div>
       </div>
 

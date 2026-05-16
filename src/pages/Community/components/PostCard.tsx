@@ -1,5 +1,8 @@
 import styled, { keyframes } from "styled-components";
 import CommentSection from "./CommentSection";
+import likeIcon from "@assets/icons/like.svg";
+import likeFilledIcon from "@assets/icons/like_filled.svg";
+import commentIcon from "@assets/icons/comment.svg";
 
 export interface PostItem {
   id: number;
@@ -8,7 +11,11 @@ export interface PostItem {
   createdAt: string;
   likes: number;
   userId: string;
-  user: { user_id: string; nickname: string };
+  user: {
+    user_id: string;
+    name: string;
+    profileImage: string;
+  };
   isLiked?: boolean;
 }
 
@@ -33,7 +40,7 @@ export default function PostCard({ post, delay = 0, onToggleLike }: Props) {
       <AuthorRow>
         <Avatar />
         <AuthorMeta>
-          <AuthorName>{post.user?.nickname ?? post.userId}</AuthorName>
+          <AuthorName>{post.user?.name ?? post.userId}</AuthorName>
           <TimeText>{timeAgo(post.createdAt)}</TimeText>
         </AuthorMeta>
       </AuthorRow>
@@ -45,7 +52,7 @@ export default function PostCard({ post, delay = 0, onToggleLike }: Props) {
 
       <ActionsRow>
         <ActionBtn onClick={() => onToggleLike(post.id)}>
-          <HeartIcon $active={!!post.isLiked} />
+          <LikeIcon $active={!!post.isLiked} />
           <ActionCount $active={!!post.isLiked}>{post.likes}</ActionCount>
         </ActionBtn>
         <ActionBtn>
@@ -72,25 +79,79 @@ const Card = styled.div<{ $delay: number }>`
   animation: ${fadeIn} 0.3s ease both;
   animation-delay: ${(p) => p.$delay}ms;
 `;
-const AuthorRow = styled.div`display: flex; align-items: center; gap: 10px; margin-bottom: 10px;`;
-const Avatar = styled.div`width: 34px; height: 34px; border-radius: 50%; background: #d9d9d9; flex-shrink: 0;`;
-const AuthorMeta = styled.div`display: flex; align-items: baseline; gap: 6px;`;
-const AuthorName = styled.span`font-weight: 700; font-size: 14.5px; color: #2c1b1b;`;
-const TimeText = styled.span`font-size: 12px; color: #a8a8a8;`;
-const Title = styled.p`font-size: 15px; font-weight: 700; color: #2c1b1b; margin: 0 0 4px;`;
-const Body = styled.p`font-size: 14px; color: #7c7070; line-height: 1.6; margin: 0 0 12px;`;
-const Divider = styled.div`height: 1px; background: #f1b9b0; margin: 0 -2px;`;
-const ActionsRow = styled.div`display: flex; align-items: center; gap: 18px; padding: 10px 0 4px;`;
-const ActionBtn = styled.button`display: flex; align-items: center; gap: 6px; background: none; border: none; cursor: pointer; padding: 0;`;
-const ActionCount = styled.span<{ $active: boolean }>`font-size: 13px; font-weight: 600; color: ${(p) => (p.$active ? "#E88B8B" : "#7c7070")};`;
+const AuthorRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+`;
+const Avatar = styled.div`
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #d9d9d9;
+  flex-shrink: 0;
+`;
+const AuthorMeta = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+`;
+const AuthorName = styled.span`
+  font-weight: 700;
+  font-size: 14.5px;
+  color: #2c1b1b;
+`;
+const TimeText = styled.span`
+  font-size: 12px;
+  color: #a8a8a8;
+`;
+const Title = styled.p`
+  font-size: 15px;
+  font-weight: 700;
+  color: #2c1b1b;
+  margin: 0 0 4px;
+`;
+const Body = styled.p`
+  font-size: 14px;
+  color: #7c7070;
+  line-height: 1.6;
+  margin: 0 0 12px;
+`;
+const Divider = styled.div`
+  height: 1px;
+  background: #f1b9b0;
+  margin: 0 -2px;
+`;
+const ActionsRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 0 4px;
+`;
+const ActionBtn = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+`;
+const ActionCount = styled.span<{ $active: boolean }>`
+  font-size: 13px;
+  font-weight: 600;
+  color: ${(p) => (p.$active ? "#E88B8B" : "#7c7070")};
+`;
 
-const HeartIcon = ({ $active }: { $active: boolean }) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill={$active ? "#E88B8B" : "none"} stroke={$active ? "#E88B8B" : "#9a9a9a"} strokeWidth="1.7" strokeLinejoin="round">
-    <path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" />
-  </svg>
+const IconImage = styled.img`
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+`;
+
+const LikeIcon = ({ $active }: { $active: boolean }) => (
+  <IconImage src={$active ? likeFilledIcon : likeIcon} alt="좋아요" />
 );
-const CommentIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9a9a9a" strokeWidth="1.7" strokeLinejoin="round">
-    <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v10A1.5 1.5 0 0 1 18.5 17H9l-4 4v-15.5z" />
-  </svg>
-);
+
+const CommentIcon = () => <IconImage src={commentIcon} alt="댓글" />;

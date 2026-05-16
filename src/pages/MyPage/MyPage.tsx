@@ -15,7 +15,8 @@ interface PregnancyInfo {
 
 interface UserInfo {
   user_id: string;
-  nickname: string;
+  name: string;
+  profileImage: string;
 }
 
 interface Post {
@@ -24,8 +25,14 @@ interface Post {
   content: string;
   createdAt: string;
   likes: number;
-  userId: string;
-  user: UserInfo;
+  commentsCount: number;
+
+  user: {
+    user_id: string;
+    name: string;
+    profileImage?: string;
+  };
+  isLiked: boolean;
 }
 
 interface HeartRateRecord {
@@ -42,19 +49,34 @@ interface ExerciseHistoryResponse {
 
 const DAYS = ["월", "화", "수", "목", "금", "토", "오늘"] as const;
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function getKstDateOnlyTime(date: Date) {
+  const kst = new Date(date.getTime() + KST_OFFSET_MS);
+
+  return Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());
+}
+
 function calcDDay(iso: string) {
-  const diff = new Date(iso).getTime() - Date.now();
-  const dDay = Math.ceil(diff / 86400000);
+  // D-day는 한국 기준 날짜 차이로 계산
+  const todayKst = getKstDateOnlyTime(new Date());
+  const dueKst = getKstDateOnlyTime(new Date(iso));
+  const dDay = Math.ceil((dueKst - todayKst) / MS_PER_DAY);
+
   return { dDay, weeksLeft: Math.floor(dDay / 7) };
 }
 
 function formatDueDate(iso: string) {
-  const d = new Date(iso);
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+  const d = new Date(new Date(iso).getTime() + KST_OFFSET_MS);
+
+  return `${d.getUTCFullYear()}년 ${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일`;
 }
 
 function isToday(dateStr: string) {
-  return new Date(dateStr).toDateString() === new Date().toDateString();
+  return (
+    getKstDateOnlyTime(new Date(dateStr)) === getKstDateOnlyTime(new Date())
+  );
 }
 
 // ── Page ──────────────────────────────────────────────────────
@@ -65,6 +87,7 @@ export default function MyPage() {
     DAYS.map((day) => ({ day, bpm: null })),
   );
   const [myPosts, setMyPosts] = useState<Post[]>([]);
+  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [exerciseCount, setExerciseCount] = useState(0);
   const [showHRModal, setShowHRModal] = useState(false);
 
@@ -88,10 +111,10 @@ export default function MyPage() {
     }
   }, []);
 
-  // ── 주간 심박수: GET /heartrate/weekly ───────────────────
+  // ── 주간 심박수: GET /heart-rate/weekly ───────────────────
   const loadHeartRate = useCallback(async () => {
     try {
-      const data = await getJson<HeartRateRecord[]>("/heartrate/weekly");
+      const data = await getJson<HeartRateRecord[]>("/heart-rate/weekly");
       const today = new Date();
 
       // ✅ Fix: 이번 주 월요일을 기준점으로 고정한 뒤 i일씩 더함
@@ -122,16 +145,18 @@ export default function MyPage() {
     }
   }, []);
 
-  // ── 내 게시물: GET /community/posts → userId 필터 ────────
+  // ── 내 게시물/좋아요한 게시물 조회 ────────────────────
   const loadPosts = useCallback(async () => {
-    if (!user) return;
     try {
-      const all = await getJson<Post[]>("/community/posts");
-      setMyPosts(all.filter((p) => p.userId === user.user_id));
+      const my = await getJson<Post[]>("/community/posts/me");
+      const liked = await getJson<Post[]>("/community/posts/liked");
+
+      setMyPosts(my);
+      setLikedPosts(liked);
     } catch (e) {
       console.error("[MyPage] 게시물 로드 실패:", e);
     }
-  }, [user]);
+  }, []);
 
   // ── 운동 횟수: GET /exercise/history ───────────────
   const loadExerciseCount = useCallback(async () => {
@@ -180,10 +205,10 @@ export default function MyPage() {
   return (
     <div className={styles.page}>
       <ProfileSection
-        name={user?.nickname ?? ""}
-        handle="@me"
+        name={user?.name ?? ""}
+        profileImage={user?.profileImage ?? null}
         postCount={myPosts.length}
-        likeCount={0}
+        likeCount={likedPosts.length}
         exerciseCount={exerciseCount}
       />
 
@@ -204,7 +229,7 @@ export default function MyPage() {
           onMeasure={() => setShowHRModal(true)}
         />
 
-        <PostsTab posts={myPosts} likedPosts={[]} />
+        <PostsTab posts={myPosts} likedPosts={likedPosts} />
       </div>
 
       {/* 오늘 심박 없을 때 모달 */}

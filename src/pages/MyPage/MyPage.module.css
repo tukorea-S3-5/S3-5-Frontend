@@ -1,15 +1,15 @@
 /* ── 디자인 토큰 ─────────────────────────── */
 :root {
-  --primary: #E85D5D;
-  --primary-soft: #FFDDD8;
-  --primary-bg: #FFF4F4;
-  --accent: #FF8B8B;
+  --primary: #e85d5d;
+  --primary-soft: #ffddd8;
+  --primary-bg: #fff4f4;
+  --accent: #ff8b8b;
   --white: #ffffff;
   --bg: #fafafa;
   --text-dark: #2d1f1f;
   --text-mid: #b07070;
-  --text-light: #CCA0A0;
-  --border: #FAEAEA;
+  --text-light: #cca0a0;
+  --border: #faeaea;
 }
 
 /* ── 페이지 ─────────────────────────────── */
@@ -18,7 +18,7 @@
   flex-direction: column;
   min-height: 100vh;
   background: var(--bg);
-  font-family: 'Nunito', sans-serif;
+  font-family: "Nunito", sans-serif;
 }
 
 .scrollContent {
@@ -32,7 +32,11 @@
 
 /* ── 프로필 섹션 ─────────────────────────── */
 .profileSection {
-  background: linear-gradient(180deg, var(--primary-soft) 0%, var(--white) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--primary-soft) 0%,
+    var(--white) 100%
+  );
   padding: 20px 20px 0;
 }
 
@@ -59,6 +63,14 @@
   justify-content: center;
   font-size: 24px;
   font-weight: 800;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
 }
 
 .cameraBtn {
@@ -351,8 +363,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #FFF9F4;
-  border: 1px solid #FFD5B8;
+  background: #fff9f4;
+  border: 1px solid #ffd5b8;
   border-radius: 12px;
   padding: 10px 10px 10px 12px;
 }
@@ -367,8 +379,15 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.8); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
 }
 
 .hrMissingText {
@@ -416,7 +435,7 @@
 }
 
 .postsTabActive::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -1px;
   left: 20%;
