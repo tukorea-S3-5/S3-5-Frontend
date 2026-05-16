@@ -32,9 +32,8 @@ export default function PregnancyEditModal({
 
   return (
     <Overlay>
-      <ModalBox>
-        <Title>임신 정보 수정</Title>
-
+      <ModalBox role="dialog" aria-modal="true" aria-labelledby="pregnancy-edit-title">
+        <Title id="pregnancy-edit-title">임신 정보 수정</Title>
         <Field>
           <Label>임신 전 체중 (kg)</Label>
           <Input
