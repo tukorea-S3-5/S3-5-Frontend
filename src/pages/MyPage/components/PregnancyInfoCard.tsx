@@ -24,7 +24,12 @@ const PregnancyInfoCard: React.FC<PregnancyInfoCardProps> = ({
           <span className={styles.cardIcon}>🤰</span>
           임신 정보
         </div>
-        <button type="button" className={styles.cardAction} onClick={onEdit}>
+        <button
+          type="button"
+          className={styles.cardAction}
+          onClick={onEdit}
+          aria-label="임신 정보 수정"
+        >
           <PencilIcon size={15} strokeWidth={2} />
         </button>
       </div>
