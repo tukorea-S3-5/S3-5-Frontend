@@ -21,6 +21,7 @@ import PregnancyOnboardingPage from "./pages/PregnancyOnboarding/PregnancyOnboar
 import ExerciseListPage from "./pages/ExerciseList/ExerciseListPage";
 import MyPage from "./pages/MyPage";
 import CommunityPage from "./pages/Community/CommunityPage";
+import CommunityDetailPage from "./pages/Community/CommunityDetailPage";
 
 function App() {
   return (
@@ -106,7 +107,10 @@ function AppRoutes() {
           <Route path="exercise" element={<ExercisePage />} />
           <Route path="report" element={<ReportPage />} />
           <Route path="community" element={<CommunityPage />} />
-          
+          <Route
+            path="/community/posts/:id"
+            element={<CommunityDetailPage />}
+          />
 
           <Route
             path="record"

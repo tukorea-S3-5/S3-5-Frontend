@@ -1,5 +1,6 @@
 import React from "react";
 import styles from "../MyPage.module.css";
+import { PencilIcon } from "lucide-react";
 
 interface PregnancyInfoCardProps {
   dueDate: string; // "2026년 7월 20일"
@@ -23,8 +24,13 @@ const PregnancyInfoCard: React.FC<PregnancyInfoCardProps> = ({
           <span className={styles.cardIcon}>🤰</span>
           임신 정보
         </div>
-        <button className={styles.cardAction} onClick={onEdit}>
-          ✏️ 수정
+        <button
+          type="button"
+          className={styles.cardAction}
+          onClick={onEdit}
+          aria-label="임신 정보 수정"
+        >
+          <PencilIcon size={15} strokeWidth={2} />
         </button>
       </div>
 

@@ -14,7 +14,11 @@ type Step = "connect" | "measuring" | "done";
 
 const MEASURE_SEC = 60;
 
-export default function RestingHeartRateModal({ isOpen, onClose, onSaved }: Props) {
+export default function RestingHeartRateModal({
+  isOpen,
+  onClose,
+  onSaved,
+}: Props) {
   const { isConnected, currentBpm, sensorState, connect } = useHeartRateBle();
 
   const [step, setStep] = useState<Step>("connect");
@@ -39,27 +43,33 @@ export default function RestingHeartRateModal({ isOpen, onClose, onSaved }: Prop
     if (step !== "measuring") return;
     timerRef.current = setInterval(() => {
       setCountdown((prev) => {
-        if (prev <= 1) { clearInterval(timerRef.current!); return 0; }
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          return 0;
+        }
         return prev - 1;
       });
       if (currentBpm && currentBpm > 30 && currentBpm < 200) {
         setBpmSamples((prev) => [...prev, currentBpm]);
       }
     }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [step, currentBpm]);
 
   // 카운트다운 0 → 평균 계산 + 저장
   useEffect(() => {
     if (step !== "measuring" || countdown > 0) return;
-    const avg = bpmSamples.length > 0
-      ? Math.round(bpmSamples.reduce((a, b) => a + b, 0) / bpmSamples.length)
-      : null;
+    const avg =
+      bpmSamples.length > 0
+        ? Math.round(bpmSamples.reduce((a, b) => a + b, 0) / bpmSamples.length)
+        : null;
     setAvgBpm(avg);
     setStep("done");
     if (avg) {
       setSaving(true);
-      postJson("/heartrate/resting", { bpm: avg })
+      postJson("/heart-rate/resting", { restingHeartRate: avg })
         .then(() => onSaved?.(avg))
         .catch((e) => console.error("[RestingHR] 저장 실패:", e))
         .finally(() => setSaving(false));
@@ -80,12 +90,14 @@ export default function RestingHeartRateModal({ isOpen, onClose, onSaved }: Prop
   return (
     <Backdrop onClick={handleClose}>
       <Card onClick={(e) => e.stopPropagation()}>
-
         {/* ── 연결 단계 ── */}
         {step === "connect" && (
           <>
             <Title>안정 심박수 측정</Title>
-            <Desc>워치와 블루투스를 연결한 뒤{"\n"}1분간 안정 심박수를 측정합니다.{"\n"}편안하게 앉아 센서에 손가락을 올려주세요.</Desc>
+            <Desc>
+              워치와 블루투스를 연결한 뒤{"\n"}1분간 안정 심박수를 측정합니다.
+              {"\n"}편안하게 앉아 센서에 손가락을 올려주세요.
+            </Desc>
             <PrimaryBtn onClick={connect}>블루투스 연결하기</PrimaryBtn>
             <TextBtn onClick={handleClose}>나중에 할게요</TextBtn>
           </>
@@ -97,7 +109,11 @@ export default function RestingHeartRateModal({ isOpen, onClose, onSaved }: Prop
             <Title>측정 중...</Title>
             <Desc>편안하게 앉아 움직이지 마세요</Desc>
 
-            <img src={heartbeatGif} alt="측정 중" style={{ width: 140, height: 140, objectFit: "contain" }} />
+            <img
+              src={heartbeatGif}
+              alt="측정 중"
+              style={{ width: 140, height: 140, objectFit: "contain" }}
+            />
 
             <BpmRow>
               <BpmNum>{currentBpm ?? "—"}</BpmNum>
@@ -110,10 +126,21 @@ export default function RestingHeartRateModal({ isOpen, onClose, onSaved }: Prop
 
             <RingWrap>
               <svg width="100" height="100" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="#fbe3dd" strokeWidth="7" />
                 <circle
-                  cx="50" cy="50" r="42" fill="none"
-                  stroke="#e88b8b" strokeWidth="7"
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  fill="none"
+                  stroke="#fbe3dd"
+                  strokeWidth="7"
+                />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  fill="none"
+                  stroke="#e88b8b"
+                  strokeWidth="7"
                   strokeLinecap="round"
                   strokeDasharray={`${2 * Math.PI * 42}`}
                   strokeDashoffset={`${2 * Math.PI * 42 * (countdown / MEASURE_SEC)}`}
@@ -139,10 +166,11 @@ export default function RestingHeartRateModal({ isOpen, onClose, onSaved }: Prop
               <BpmUnit>bpm</BpmUnit>
             </BpmRow>
             {saving && <SensorHint>저장 중...</SensorHint>}
-            <PrimaryBtn onClick={handleClose} disabled={saving}>확인</PrimaryBtn>
+            <PrimaryBtn onClick={handleClose} disabled={saving}>
+              확인
+            </PrimaryBtn>
           </>
         )}
-
       </Card>
     </Backdrop>
   );
@@ -154,7 +182,8 @@ const fadeIn = keyframes`
 `;
 
 const Backdrop = styled.div`
-  position: fixed; inset: 0;
+  position: fixed;
+  inset: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
@@ -178,62 +207,110 @@ const Card = styled.div`
 `;
 
 const BigEmoji = styled.div`
-  font-size: 52px; line-height: 1; margin-bottom: 4px;
+  font-size: 52px;
+  line-height: 1;
+  margin-bottom: 4px;
 `;
 
 const Title = styled.h2`
-  font-size: 20px; font-weight: 800; color: #2c1b1b; margin: 0; text-align: center;
+  font-size: 20px;
+  font-weight: 800;
+  color: #2c1b1b;
+  margin: 0;
+  text-align: center;
 `;
 
 const Desc = styled.p`
-  font-size: 14px; color: #7c7070; margin: 0;
-  text-align: center; white-space: pre-line; line-height: 1.7;
+  font-size: 14px;
+  color: #7c7070;
+  margin: 0;
+  text-align: center;
+  white-space: pre-line;
+  line-height: 1.7;
 `;
 
 const BpmRow = styled.div`
-  display: flex; align-items: baseline; gap: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
 `;
 
 const BpmNum = styled.span`
-  font-size: 52px; font-weight: 800; color: #e88b8b; line-height: 1;
+  font-size: 52px;
+  font-weight: 800;
+  color: #e88b8b;
+  line-height: 1;
 `;
 
 const BpmUnit = styled.span`
-  font-size: 18px; font-weight: 600; color: #a8a8a8;
+  font-size: 18px;
+  font-weight: 600;
+  color: #a8a8a8;
 `;
 
 const SensorHint = styled.p`
-  font-size: 12px; color: #a8a8a8; margin: 0; text-align: center;
+  font-size: 12px;
+  color: #a8a8a8;
+  margin: 0;
+  text-align: center;
 `;
 
 const RingWrap = styled.div`
   position: relative;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin: 4px 0;
 `;
 
 const RingLabel = styled.span`
-  position: absolute; font-size: 18px; font-weight: 800; color: #2c1b1b;
+  position: absolute;
+  font-size: 18px;
+  font-weight: 800;
+  color: #2c1b1b;
 `;
 
 const PrimaryBtn = styled.button`
-  width: 100%; padding: 14px;
-  background: #e88b8b; color: #fff;
-  border: none; border-radius: 14px;
-  font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 6px;
+  width: 100%;
+  padding: 14px;
+  background: #e88b8b;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 6px;
   transition: filter 0.15s;
-  &:hover:not(:disabled) { filter: brightness(0.93); }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
+  &:hover:not(:disabled) {
+    filter: brightness(0.93);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const OutlineBtn = styled.button`
-  width: 100%; padding: 13px;
-  background: none; border: 1px solid #f4c9c2; border-radius: 14px;
-  font-size: 14px; font-weight: 600; color: #a8a8a8; cursor: pointer;
+  width: 100%;
+  padding: 13px;
+  background: none;
+  border: 1px solid #f4c9c2;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #a8a8a8;
+  cursor: pointer;
 `;
 
 const TextBtn = styled.button`
-  background: none; border: none; font-size: 13px;
-  color: #bbb; cursor: pointer; padding: 4px;
-  &:hover { color: #999; }
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: #bbb;
+  cursor: pointer;
+  padding: 4px;
+  &:hover {
+    color: #999;
+  }
 `;

@@ -3,7 +3,6 @@ import styled from "styled-components";
 import { getJson, postJson } from "../../api/http";
 import PostCard, { PostItem } from "./components/PostCard";
 
-
 export default function CommunityPage() {
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -13,6 +12,7 @@ export default function CommunityPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
 
   // GET /community/posts
   const load = useCallback(async () => {
@@ -32,14 +32,29 @@ export default function CommunityPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    getJson<{ profileImage?: string | null }>("/user/me")
+      .then((data) => {
+        setProfileImage(data.profileImage ?? null);
+      })
+      .catch((e) => {
+        console.error("[Community] 프로필 이미지 로드 실패:", e);
+      });
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // POST /community/posts
   const submitPost = async () => {
     if (!title.trim() || !content.trim() || busy) return;
     setBusy(true);
     try {
-      await postJson("/community/posts", { title: title.trim(), content: content.trim() });
+      await postJson("/community/posts", {
+        title: title.trim(),
+        content: content.trim(),
+      });
       setTitle("");
       setContent("");
       setExpanded(false);
@@ -63,28 +78,37 @@ export default function CommunityPage() {
     setPosts((prev) =>
       prev.map((p) =>
         p.id === postId
-          ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 }
-          : p
-      )
+          ? {
+              ...p,
+              isLiked: !p.isLiked,
+              likes: p.isLiked ? p.likes - 1 : p.likes + 1,
+            }
+          : p,
+      ),
     );
     try {
-      const res = await postJson(`/community/posts/${postId}/like`, {}) as {
-        liked: boolean; likes: number;
+      const res = (await postJson(`/community/posts/${postId}/like`, {})) as {
+        liked: boolean;
+        likes: number;
       };
       // 서버 응답으로 정확한 상태 동기화
       setPosts((prev) =>
         prev.map((p) =>
-          p.id === postId ? { ...p, isLiked: res.liked, likes: res.likes } : p
-        )
+          p.id === postId ? { ...p, isLiked: res.liked, likes: res.likes } : p,
+        ),
       );
     } catch {
       // 실패 시 낙관적 업데이트 원복
       setPosts((prev) =>
         prev.map((p) =>
           p.id === postId
-            ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 }
-            : p
-        )
+            ? {
+                ...p,
+                isLiked: !p.isLiked,
+                likes: p.isLiked ? p.likes - 1 : p.likes + 1,
+              }
+            : p,
+        ),
       );
     }
   };
@@ -94,7 +118,11 @@ export default function CommunityPage() {
       {/* ── 글쓰기 카드 ── */}
       <WriteCard>
         <TriggerRow onClick={() => !expanded && setExpanded(true)}>
-          <Av />
+          <Av>
+            {profileImage ? (
+              <AvImage src={profileImage} alt="내 프로필 이미지" />
+            ) : null}
+          </Av>
           {!expanded ? (
             <Placeholder>오늘 어떠셨나요? 글을 작성해보세요 ✍️</Placeholder>
           ) : (
@@ -140,6 +168,7 @@ export default function CommunityPage() {
           post={post}
           delay={i * 80}
           onToggleLike={toggleLike}
+          profileImage={profileImage}
         />
       ))}
     </Feed>
@@ -153,12 +182,13 @@ const Feed = styled.div`
   min-height: 100%;
   padding: 14px 16px 120px;
   gap: 14px;
-  background: linear-gradient(180deg, #fbd7d0 0%, #fff 220px);
 `;
 
 const Hint = styled.p`
-  text-align: center; padding: 40px 0;
-  font-size: 14px; color: #a8a8a8;
+  text-align: center;
+  padding: 40px 0;
+  font-size: 14px;
+  color: #a8a8a8;
 `;
 
 const WriteCard = styled.div`
@@ -173,23 +203,47 @@ const WriteCard = styled.div`
 `;
 
 const TriggerRow = styled.div`
-  display: flex; align-items: center; gap: 10px; cursor: text;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: text;
 `;
 
 const Av = styled.div`
-  width: 34px; height: 34px; border-radius: 50%;
-  background: #d9d9d9; flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #d9d9d9;
+  flex-shrink: 0;
+  overflow: hidden;
+`;
+
+const AvImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
 `;
 
 const Placeholder = styled.span`
-  font-size: 14px; color: #bfbfbf; flex: 1;
+  font-size: 14px;
+  color: #bfbfbf;
+  flex: 1;
 `;
 
 const TitleInput = styled.input`
-  flex: 1; border: none; outline: none;
-  font-size: 15px; font-weight: 600; color: #2c1b1b;
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  font-weight: 600;
+  color: #2c1b1b;
   background: transparent;
-  &::placeholder { color: #bfbfbf; font-weight: 400; }
+  &::placeholder {
+    color: #bfbfbf;
+    font-weight: 400;
+  }
 `;
 
 const ContentTextarea = styled.textarea`
@@ -197,39 +251,64 @@ const ContentTextarea = styled.textarea`
   border: 1px solid #f4c9c2;
   border-radius: 10px;
   padding: 10px 12px;
-  font-size: 14px; color: #2c1b1b;
-  outline: none; resize: none; height: 100px;
+  font-size: 14px;
+  color: #2c1b1b;
+  outline: none;
+  resize: none;
+  height: 100px;
   box-sizing: border-box;
-  font-family: inherit; line-height: 1.6;
-  &::placeholder { color: #bfbfbf; }
-  &:focus { border-color: #e88b8b; }
+  font-family: inherit;
+  line-height: 1.6;
+  &::placeholder {
+    color: #bfbfbf;
+  }
+  &:focus {
+    border-color: #e88b8b;
+  }
 `;
 
 const WriteFooter = styled.div`
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 `;
 
 const CharCount = styled.span`
-  font-size: 12px; color: #a8a8a8;
+  font-size: 12px;
+  color: #a8a8a8;
 `;
 
 const BtnRow = styled.div`
-  display: flex; gap: 8px;
+  display: flex;
+  gap: 8px;
 `;
 
 const CancelBtn = styled.button`
   padding: 8px 16px;
-  border: 1px solid #f4c9c2; border-radius: 10px;
-  background: none; font-size: 13px; font-weight: 600;
-  color: #a8a8a8; cursor: pointer;
+  border: 1px solid #f4c9c2;
+  border-radius: 10px;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: #a8a8a8;
+  cursor: pointer;
 `;
 
 const SubmitBtn = styled.button`
   padding: 8px 20px;
-  border: none; border-radius: 10px;
-  background: #e88b8b; font-size: 13px; font-weight: 700;
-  color: #fff; cursor: pointer;
+  border: none;
+  border-radius: 10px;
+  background: #e88b8b;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
   transition: filter 0.15s;
-  &:hover:not(:disabled) { filter: brightness(0.93); }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
+  &:hover:not(:disabled) {
+    filter: brightness(0.93);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;

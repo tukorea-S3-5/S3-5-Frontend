@@ -5,17 +5,22 @@ import HeartRateCard, { DailyHeartRate } from "./components/HeartRateCard";
 import PostsTab from "./components/PostsTab";
 import RestingHeartRateModal from "../../components/RestingHeartRateModal";
 import styles from "./MyPage.module.css";
-import { getJson } from "../../api/http";
+import { getJson, putJson } from "../../api/http";
+import NameEditModal from "./components/NameEditModal";
+import PregnancyEditModal from "./components/PregnancyEditModal";
 
 // ── 타입 ──────────────────────────────────────────────────────
 interface PregnancyInfo {
   due_date: string;
   week: number;
+  pre_weight?: number;
+  is_multiple?: boolean;
 }
 
 interface UserInfo {
   user_id: string;
-  nickname: string;
+  name: string;
+  profileImage: string;
 }
 
 interface Post {
@@ -24,8 +29,14 @@ interface Post {
   content: string;
   createdAt: string;
   likes: number;
-  userId: string;
-  user: UserInfo;
+  commentsCount: number;
+
+  user: {
+    user_id: string;
+    name: string;
+    profileImage?: string;
+  };
+  isLiked: boolean;
 }
 
 interface HeartRateRecord {
@@ -42,19 +53,34 @@ interface ExerciseHistoryResponse {
 
 const DAYS = ["월", "화", "수", "목", "금", "토", "오늘"] as const;
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function getKstDateOnlyTime(date: Date) {
+  const kst = new Date(date.getTime() + KST_OFFSET_MS);
+
+  return Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());
+}
+
 function calcDDay(iso: string) {
-  const diff = new Date(iso).getTime() - Date.now();
-  const dDay = Math.ceil(diff / 86400000);
+  // D-day는 한국 기준 날짜 차이로 계산
+  const todayKst = getKstDateOnlyTime(new Date());
+  const dueKst = getKstDateOnlyTime(new Date(iso));
+  const dDay = Math.ceil((dueKst - todayKst) / MS_PER_DAY);
+
   return { dDay, weeksLeft: Math.floor(dDay / 7) };
 }
 
 function formatDueDate(iso: string) {
-  const d = new Date(iso);
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+  const d = new Date(new Date(iso).getTime() + KST_OFFSET_MS);
+
+  return `${d.getUTCFullYear()}년 ${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일`;
 }
 
 function isToday(dateStr: string) {
-  return new Date(dateStr).toDateString() === new Date().toDateString();
+  return (
+    getKstDateOnlyTime(new Date(dateStr)) === getKstDateOnlyTime(new Date())
+  );
 }
 
 // ── Page ──────────────────────────────────────────────────────
@@ -65,8 +91,16 @@ export default function MyPage() {
     DAYS.map((day) => ({ day, bpm: null })),
   );
   const [myPosts, setMyPosts] = useState<Post[]>([]);
+  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [exerciseCount, setExerciseCount] = useState(0);
   const [showHRModal, setShowHRModal] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [isEditingPregnancy, setIsEditingPregnancy] = useState(false);
+  const [preWeightInput, setPreWeightInput] = useState(0);
+  const [dueDateInput, setDueDateInput] = useState("");
+  const [isMultipleInput, setIsMultipleInput] = useState(false);
+  const [isSavingPregnancy, setIsSavingPregnancy] = useState(false);
 
   // ── 유저 정보: GET /user/me ───────────────────────────────
   const loadUser = useCallback(async () => {
@@ -88,10 +122,10 @@ export default function MyPage() {
     }
   }, []);
 
-  // ── 주간 심박수: GET /heartrate/weekly ───────────────────
+  // ── 주간 심박수: GET /heart-rate/weekly ───────────────────
   const loadHeartRate = useCallback(async () => {
     try {
-      const data = await getJson<HeartRateRecord[]>("/heartrate/weekly");
+      const data = await getJson<HeartRateRecord[]>("/heart-rate/weekly");
       const today = new Date();
 
       // ✅ Fix: 이번 주 월요일을 기준점으로 고정한 뒤 i일씩 더함
@@ -122,16 +156,18 @@ export default function MyPage() {
     }
   }, []);
 
-  // ── 내 게시물: GET /community/posts → userId 필터 ────────
+  // ── 내 게시물/좋아요한 게시물 조회 ────────────────────
   const loadPosts = useCallback(async () => {
-    if (!user) return;
     try {
-      const all = await getJson<Post[]>("/community/posts");
-      setMyPosts(all.filter((p) => p.userId === user.user_id));
+      const my = await getJson<Post[]>("/community/posts/me");
+      const liked = await getJson<Post[]>("/community/posts/liked");
+
+      setMyPosts(my);
+      setLikedPosts(liked);
     } catch (e) {
       console.error("[MyPage] 게시물 로드 실패:", e);
     }
-  }, [user]);
+  }, []);
 
   // ── 운동 횟수: GET /exercise/history ───────────────
   const loadExerciseCount = useCallback(async () => {
@@ -177,24 +213,74 @@ export default function MyPage() {
     setShowHRModal(false);
   };
 
+  const handleOpenNameEdit = () => {
+    setNameInput(user?.name ?? "");
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    try {
+      const updatedUser = await putJson<UserInfo>("/user/me", {
+        name: nameInput.trim(),
+      });
+
+      setUser(updatedUser);
+      setIsEditingName(false);
+    } catch (e) {
+      console.error("[MyPage] 이름 수정 실패:", e);
+    }
+  };
+
+  const handleOpenPregnancyEdit = () => {
+    setPreWeightInput(pregnancy?.pre_weight ?? 0);
+    setDueDateInput(pregnancy?.due_date?.slice(0, 10) ?? "");
+    setIsMultipleInput(pregnancy?.is_multiple ?? false);
+    setIsEditingPregnancy(true);
+  };
+
+  const handleSavePregnancy = async () => {
+    if (!dueDateInput || isSavingPregnancy) return;
+
+    try {
+      setIsSavingPregnancy(true);
+
+      const updatedPregnancy = await putJson<PregnancyInfo>("/pregnancy/me", {
+        pre_weight: preWeightInput,
+        due_date: dueDateInput,
+        is_multiple: isMultipleInput,
+      });
+
+      setPregnancy(updatedPregnancy);
+      setIsEditingPregnancy(false);
+    } catch (e) {
+      console.error("[MyPage] 임신 정보 수정 실패:", e);
+    } finally {
+      setIsSavingPregnancy(false);
+    }
+  };
+
   return (
     <div className={styles.page}>
       <ProfileSection
-        name={user?.nickname ?? ""}
-        handle="@me"
+        name={user?.name ?? ""}
+        profileImage={user?.profileImage ?? null}
         postCount={myPosts.length}
-        likeCount={0}
+        likeCount={likedPosts.length}
         exerciseCount={exerciseCount}
+        onEditProfile={handleOpenNameEdit}
       />
 
       <div className={styles.scrollContent}>
         {pregnancy && (
-          <PregnancyInfoCard
-            dueDate={formatDueDate(pregnancy.due_date)}
-            dDay={dDay}
-            weeksLeft={weeksLeft}
-            currentWeek={pregnancy.week}
-          />
+          <div>
+            <PregnancyInfoCard
+              dueDate={formatDueDate(pregnancy.due_date)}
+              dDay={dDay}
+              weeksLeft={weeksLeft}
+              currentWeek={pregnancy.week}
+              onEdit={handleOpenPregnancyEdit}
+            />
+          </div>
         )}
 
         <HeartRateCard
@@ -204,8 +290,30 @@ export default function MyPage() {
           onMeasure={() => setShowHRModal(true)}
         />
 
-        <PostsTab posts={myPosts} likedPosts={[]} />
+        <PostsTab posts={myPosts} likedPosts={likedPosts} />
       </div>
+
+      <NameEditModal
+        isOpen={isEditingName}
+        value={nameInput}
+        isSaving={false}
+        onChange={setNameInput}
+        onClose={() => setIsEditingName(false)}
+        onSave={handleSaveName}
+      />
+
+      <PregnancyEditModal
+        isOpen={isEditingPregnancy}
+        preWeight={preWeightInput}
+        dueDate={dueDateInput}
+        isMultiple={isMultipleInput}
+        isSaving={isSavingPregnancy}
+        onPreWeightChange={setPreWeightInput}
+        onDueDateChange={setDueDateInput}
+        onIsMultipleChange={setIsMultipleInput}
+        onClose={() => setIsEditingPregnancy(false)}
+        onSave={handleSavePregnancy}
+      />
 
       {/* 오늘 심박 없을 때 모달 */}
       <RestingHeartRateModal
