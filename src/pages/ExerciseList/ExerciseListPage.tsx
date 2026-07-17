@@ -33,6 +33,15 @@ interface SessionResponse {
   }[];
 }
 
+interface CurrentSessionResponse {
+  session_id: number;
+  status: string;
+  records: {
+    record_id: number;
+    exercise_id: number;
+  }[];
+}
+
 interface RecommendResponse {
   recommend: ExerciseFromAPI[];
   caution: ExerciseFromAPI[];
@@ -78,12 +87,27 @@ const ExerciseListPage = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [ongoingSession, setOngoingSession] =
+    useState<CurrentSessionResponse | null>(null);
 
+  // 추천 운동 불러오기
   useEffect(() => {
     getJson<RecommendResponse>(`/recommend?t=${Date.now()}`)
       .then((json) => setData(json))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
+  }, []);
+
+  // 진행 중인 세션 확인
+  useEffect(() => {
+    getJson<any>("/exercise/session/current")
+      .then((res) => {
+        // 백엔드에서 세션이 있으면 status가 'ONGOING'인 객체가 통째로 옵니다.
+        if (res && res.status === "ONGOING") {
+          setOngoingSession(res);
+        }
+      })
+      .catch(() => console.log("진행 중인 세션 없음"));
   }, []);
 
   const exercisesByTab: Record<TabKey, Exercise[]> = {
@@ -162,6 +186,29 @@ const ExerciseListPage = () => {
     }
   };
 
+  const handleResumeSession = () => {
+    if (!ongoingSession) return;
+
+    // 진행 중인 세션에 들어있던 운동 ID들을 뽑아서, 전체 추천 목록에서 상세 정보를 찾습니다.
+    const recordExerciseIds = ongoingSession.records.map(
+      (r: any) => r.exercise_id,
+    );
+    const sessionExercises = selectableExercises.filter((e) =>
+      recordExerciseIds.includes(Number(e.id)),
+    );
+
+    // 운동 페이지로 하던 세션 정보 그대로 넘어갑니다
+    navigate("/exercise", {
+      state: {
+        exercises: sessionExercises,
+        session: {
+          session_id: ongoingSession.session_id,
+          records: ongoingSession.records,
+        },
+      },
+    });
+  };
+
   return (
     <Container>
       <Title>오늘의 추천 운동</Title>
@@ -172,6 +219,21 @@ const ExerciseListPage = () => {
           등의 증상이 나타나면 즉시 중단하세요.
         </p>
       </Card>
+
+      {ongoingSession && (
+        <Card variant="info" icon="🏃‍♀️" title="진행 중인 운동이 있어요!">
+          <p style={{ marginBottom: "12px" }}>
+            이전에 하다가 멈춘 운동 세션이 있습니다. 이어서 하시겠어요?
+          </p>
+          <FillButton
+            disabled={false}
+            onClick={handleResumeSession}
+            style={{ padding: "8px 16px", width: "auto" }}
+          >
+            이어서 하기
+          </FillButton>
+        </Card>
+      )}
 
       {guideline && (
         <Card variant="info" icon="💡" title={guideline.title}>
