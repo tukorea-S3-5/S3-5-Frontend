@@ -37,8 +37,6 @@ interface WeightResponse {
 interface WeightTrend {
   based_on?: string;
   slope?: number;
-  expected_slope?: number;
-  status?: string;
   slope_status?: string;
   current_position?: {
     range?: {
@@ -46,6 +44,10 @@ interface WeightTrend {
       max: number;
     };
     status?: string;
+  };
+  recommended_weekly_range?: {
+    min: number;
+    max: number;
   };
 }
 
@@ -134,12 +136,9 @@ export default function WeightPage() {
         const mappedTrend: WeightTrend = {
           based_on: trendData?.based_on ?? "",
           slope: trendData?.slope ?? 0,
-          expected_slope: trendData?.expected_slope,
-          status:
-            trendData?.slope_status ??
-            trendData?.current_position?.status ??
-            trendData?.status ??
-            "",
+          slope_status: trendData?.slope_status ?? "",
+          current_position: trendData?.current_position,
+          recommended_weekly_range: trendData?.recommended_weekly_range,
         };
 
         console.log("[trend response]", mappedTrend);
@@ -262,6 +261,13 @@ export default function WeightPage() {
       {/* 이번 주 요약 카드 */}
       <SummaryCard>
         <SectionLabel>이번 주 요약</SectionLabel>
+        {currentWeek <= 13 && (
+          <EarlyPregnancyTip>
+            💡 <b>임신 1분기(초기) 안내</b>
+            <br />이 시기에는 입덧과 식욕 저하 등으로 체중이 일시적으로
+            감소하거나 변화가 적을 수 있으니 안심하셔도 괜찮아요!
+          </EarlyPregnancyTip>
+        )}
         <GainRow>
           <GainLabel>총 증가량</GainLabel>
           <GainValue>
@@ -283,22 +289,22 @@ export default function WeightPage() {
               <TrendItem>
                 <TrendLabel>임신 평균 권장 증가량</TrendLabel>
                 <TrendValue>
-                  {trend.expected_slope != null
-                    ? `${trend.expected_slope.toFixed(2)}kg`
+                  {trend.recommended_weekly_range
+                    ? `${trend.recommended_weekly_range.min.toFixed(2)} ~ ${trend.recommended_weekly_range.max.toFixed(2)}kg`
                     : "-"}
                   <TrendUnit>/주</TrendUnit>
                 </TrendValue>
               </TrendItem>
             </TrendRow>
-            <TrendStatus statusType={getStatusType(trend?.status)}>
-              {trend.status || "상태 정보를 불러오는 중입니다."}
+            <TrendStatus
+              statusType={getStatusType(
+                trend?.slope_status ?? trend?.current_position?.status,
+              )}
+            >
+              {trend.slope_status ||
+                trend.current_position?.status ||
+                "상태 정보를 불러오는 중입니다."}
             </TrendStatus>
-            {trend.status?.includes("1분기") && (
-              <TrendDescription>
-                💡 1분기에는 입덧 등으로 체중이 일시적으로 감소하거나 변화가
-                적을 수 있어요.
-              </TrendDescription>
-            )}
           </TrendCard>
         )}
       </SummaryCard>
@@ -755,8 +761,12 @@ const WeekSelect = styled.select`
   }
 `;
 
-const TrendDescription = styled.p`
-  font-size: 11px;
-  margin: 0;
-  color: ${({ theme }) => theme.colors.subtext};
+const EarlyPregnancyTip = styled.div`
+  background: ${({ theme }) => theme.colors.light || "#faf5f3"};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  padding: ${({ theme }) => theme.spacing.md};
+  font-size: 12px;
+  line-height: 1.6;
+  color: ${({ theme }) => theme.colors.subtext || "#8b7e74"};
+  border: 1px dashed ${({ theme }) => theme.colors.sub || "#f0e8e5"};
 `;

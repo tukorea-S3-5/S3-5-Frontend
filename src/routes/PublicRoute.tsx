@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { getAccessToken } from "../api/http"; // 경로 확인 필요
+import { getAccessToken } from "../api/http";
 
 export default function PublicRoute() {
   const token = getAccessToken();

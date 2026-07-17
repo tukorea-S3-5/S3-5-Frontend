@@ -516,7 +516,6 @@
     BlinkMacSystemFont,
     sans-serif;
   font-weight: 400;
-
   text-decoration: underline; /* 텍스트 링크 느낌 */
   transition: opacity 0.2s ease;
   padding: 8px 16px;
