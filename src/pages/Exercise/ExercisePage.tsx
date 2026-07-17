@@ -34,6 +34,8 @@ interface Exercise {
 interface SessionRecord {
   record_id: number;
   exercise_id: number;
+  duration: number;
+  ended_at?: string | null;
 }
 
 interface PregnancyMeResponse {
@@ -84,15 +86,39 @@ export default function ExercisePage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastVibrationAtRef = useRef<number>(0);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  //  백엔드 데이터에서 이미 완료된(ended_at이 있는) 운동 ID 뽑아내기
+  const initialEndedIds =
+    session?.records
+      ?.filter((r: any) => r.ended_at !== null)
+      ?.map((r: any) => Number(r.exercise_id)) || [];
+
+  // 아직 완료되지 않은 첫 번째 운동의 인덱스 찾기
+  const firstUnfinishedIndex = exercises.findIndex(
+    (ex) => !initialEndedIds.includes(Number(ex.id)),
+  );
+  const startingIndex = firstUnfinishedIndex !== -1 ? firstUnfinishedIndex : 0;
+
+  // 하다가 멈춘 운동이 있다면, 그 운동의 저장된 진행 시간(초) 가져오기
+  const startingRecord = session?.records?.find(
+    (r: any) => Number(r.exercise_id) === Number(exercises[startingIndex]?.id),
+  );
+  const initialElapsed = startingRecord?.duration || 0;
+
+  // 상태 초기화에 적용
+  const [currentIndex, setCurrentIndex] = useState(startingIndex);
   const [playState, setPlayState] = useState<PlayState>("idle");
   const [duration, setDuration] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed, setElapsed] = useState(initialElapsed); // 0초 대신 저장된 시간부터!
   const [ytReady, setYtReady] = useState(false);
-  const [endedExerciseIds, setEndedExerciseIds] = useState<number[]>([]);
+  const [endedExerciseIds, setEndedExerciseIds] =
+    useState<number[]>(initialEndedIds);
+
   const [stopModal, setStopModal] = useState(false);
   const [leaveModal, setLeaveModal] = useState(false);
-  const [switchModal, setSwitchModal] = useState<{ open: boolean; targetIndex: number }>({ open: false, targetIndex: 0 });
+  const [switchModal, setSwitchModal] = useState<{
+    open: boolean;
+    targetIndex: number;
+  }>({ open: false, targetIndex: 0 });
   const [maxAllowedBpm, setMaxAllowedBpm] = useState<number | null>(null);
 
   const [showHRModal, setShowHRModal] = useState(false);
@@ -105,7 +131,7 @@ export default function ExercisePage() {
         );
         if (!hasToday) setShowHRModal(true);
       })
-      .catch(() => { }); // 실패 시 모달 띄우지 않음 (막지 않음)
+      .catch(() => {}); // 실패 시 모달 띄우지 않음 (막지 않음)
   }, []);
 
   const current = exercises[currentIndex];
@@ -115,7 +141,10 @@ export default function ExercisePage() {
       ?.record_id ?? null;
 
   useEffect(() => {
-    if (window.YT?.Player) { setYtReady(true); return; }
+    if (window.YT?.Player) {
+      setYtReady(true);
+      return;
+    }
     const existing = document.querySelector<HTMLScriptElement>(
       'script[src="https://www.youtube.com/iframe_api"]',
     );
@@ -127,7 +156,9 @@ export default function ExercisePage() {
     window.onYouTubeIframeAPIReady = () => setYtReady(true);
   }, []);
 
-  useEffect(() => { resetSessionHeartRates(); }, [resetSessionHeartRates]);
+  useEffect(() => {
+    resetSessionHeartRates();
+  }, [resetSessionHeartRates]);
 
   useEffect(() => {
     getJson<PregnancyMeResponse>("/pregnancy/me")
@@ -141,12 +172,25 @@ export default function ExercisePage() {
   useEffect(() => {
     if (!current || !ytReady || !playerElRef.current || !isConnected) return;
 
+    const currentRecord = session?.records?.find(
+      (r) => Number(r.exercise_id) === Number(current.id),
+    );
+    const startSeconds = currentRecord?.duration || 0;
+
     playerRef.current?.destroy();
-    setPlayState("idle"); setElapsed(0); setDuration(0);
+    setPlayState("idle");
+    setElapsed(startSeconds); // 무조건 0이 아니라, 저장된 시간부터 타이머가 돌게 세팅
+    setDuration(0);
 
     playerRef.current = new window.YT.Player(playerElRef.current, {
       videoId: toVideoId(current.videoUrl),
-      playerVars: { controls: 0, rel: 0, modestbranding: 1, autoplay: 0 },
+      playerVars: {
+        controls: 0,
+        rel: 0,
+        modestbranding: 1,
+        autoplay: 0,
+        start: startSeconds,
+      },
       events: {
         onReady: (e: { target: YTPlayer }) => {
           setDuration(e.target.getDuration());
@@ -174,7 +218,9 @@ export default function ExercisePage() {
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [playState]);
 
   useEffect(() => {
@@ -186,18 +232,38 @@ export default function ExercisePage() {
     vibrate(true).catch((e) => console.error("[vibration] 실패:", e));
   }, [currentBpm, maxAllowedBpm, playState, vibrate]);
 
+  // [이탈 방어] 탭 닫기, 새로고침, 뒤로 가기, 네비게이션 바 이동 감지 및 중단 처리
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (!session?.session_id || allowNavigationRef.current) return;
       e.preventDefault();
+      e.returnValue = "";
     };
+
     window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [session?.session_id]);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+
+      if (session?.session_id && !allowNavigationRef.current) {
+        console.log(
+          "🚨 페이지 이탈 감지: 운동을 '일시정지' 상태로 보존합니다.",
+        );
+
+        // 세션 전체 중단(abort)이 아니라, 현재 진행 중이던 운동(record)만 일시정지
+        const activeRecordId = getActiveRecordId();
+        if (activeRecordId) {
+          postJson("/exercise/record/pause", {
+            record_id: activeRecordId,
+          }).catch(() => {});
+        }
+      }
+    };
+  }, [session?.session_id, current.id]); // current.id(현재 운동) 의존성 추가
 
   const getActiveRecordId = () => getRecordId(current.id);
 
-  // ✅ Fix 1: boolean 반환 + 중복 API 호출 제거 + API 성공 후 상태 업데이트
+  // boolean 반환 + 중복 API 호출 제거 + API 성공 후 상태 업데이트
   const handleRecordEnd = async (
     exerciseId: number,
     onDone: () => void,
@@ -217,7 +283,9 @@ export default function ExercisePage() {
       });
       // ✅ API 성공 확인 후 로컬 상태 정리
       setEndedExerciseIds((prev) =>
-        prev.includes(Number(exerciseId)) ? prev : [...prev, Number(exerciseId)],
+        prev.includes(Number(exerciseId))
+          ? prev
+          : [...prev, Number(exerciseId)],
       );
       onDone();
       return true;
@@ -268,10 +336,16 @@ export default function ExercisePage() {
     const ended = new Set(endedExerciseIds);
     if (justEndedId) ended.add(justEndedId);
     for (let i = currentIndex + 1; i < exercises.length; i++) {
-      if (!ended.has(Number(exercises[i].id))) { setCurrentIndex(i); return; }
+      if (!ended.has(Number(exercises[i].id))) {
+        setCurrentIndex(i);
+        return;
+      }
     }
     for (let i = 0; i < currentIndex; i++) {
-      if (!ended.has(Number(exercises[i].id))) { setCurrentIndex(i); return; }
+      if (!ended.has(Number(exercises[i].id))) {
+        setCurrentIndex(i);
+        return;
+      }
     }
     finishAll();
   };
@@ -285,7 +359,11 @@ export default function ExercisePage() {
   const finishAll = () => {
     allowNavigationRef.current = true;
     navigate("/report", {
-      state: { exercises, sessionId: session?.session_id, heartRates: getSessionHeartRates() },
+      state: {
+        exercises,
+        sessionId: session?.session_id,
+        heartRates: getSessionHeartRates(),
+      },
     });
   };
 
@@ -354,7 +432,9 @@ export default function ExercisePage() {
       playerRef.current?.pauseVideo();
       setPlayState("idle");
 
-      const success = await handleRecordEnd(current.id, () => setCurrentIndex(target));
+      const success = await handleRecordEnd(current.id, () =>
+        setCurrentIndex(target),
+      );
       if (success) {
         stopExerciseMode();
       } else {
@@ -391,7 +471,10 @@ export default function ExercisePage() {
       <RestingHeartRateModal
         isOpen={showHRModal}
         onClose={() => setShowHRModal(false)}
-        onSaved={() => { setHasTodayHR(true); setShowHRModal(false); }}
+        onSaved={() => {
+          setHasTodayHR(true);
+          setShowHRModal(false);
+        }}
       />
 
       {!showHRModal && (
@@ -417,12 +500,16 @@ export default function ExercisePage() {
             <StatCard>
               <StatLabel>남은 시간</StatLabel>
               <StatValue>
-                {duration > 0 ? formatTime(Math.max(duration - elapsed, 0)) : "--:--"}
+                {duration > 0
+                  ? formatTime(Math.max(duration - elapsed, 0))
+                  : "--:--"}
               </StatValue>
             </StatCard>
             <StatCard>
               <StatLabel>❤️ 심박수</StatLabel>
-              <StatValue style={{ fontSize: isDisplayNumeric ? "30px" : "15px" }}>
+              <StatValue
+                style={{ fontSize: isDisplayNumeric ? "30px" : "15px" }}
+              >
                 {displayBpm}
                 {isDisplayNumeric && <StatUnit>bpm</StatUnit>}
               </StatValue>
@@ -436,7 +523,9 @@ export default function ExercisePage() {
 
           <ExerciseInfo>
             <ExTitle>{current.title}</ExTitle>
-            <ExMeta>{currentIndex + 1}/{exercises.length}</ExMeta>
+            <ExMeta>
+              {currentIndex + 1}/{exercises.length}
+            </ExMeta>
           </ExerciseInfo>
 
           <ControlRow>
@@ -447,7 +536,9 @@ export default function ExercisePage() {
             )}
             {playState === "playing" && (
               <>
-                <ActionButton $variant="outline" onClick={handlePause}>일시정지</ActionButton>
+                <ActionButton $variant="outline" onClick={handlePause}>
+                  일시정지
+                </ActionButton>
                 <ActionButton $variant="danger" onClick={handleCurrentEnd}>
                   {hasNextAvailableExercise ? "다음 운동" : "운동 종료"}
                 </ActionButton>
@@ -489,7 +580,11 @@ export default function ExercisePage() {
           </EmergencyStop>
 
           {/* ── 모달들 ── */}
-          <Modal isOpen={stopModal} onClose={() => setStopModal(false)} showCloseButton={false}>
+          <Modal
+            isOpen={stopModal}
+            onClose={() => setStopModal(false)}
+            showCloseButton={false}
+          >
             <ModalBody>
               <ModalEmoji>⚠️</ModalEmoji>
               <ModalTitle>운동을 종료할까요?</ModalTitle>
@@ -497,8 +592,12 @@ export default function ExercisePage() {
                 운동이 아직 남아있어요.{"\n"}지금 종료하면 리포트로 이동합니다.
               </ModalDesc>
               <ModalButtons>
-                <ModalOutlineBtn onClick={() => setStopModal(false)}>계속할게요</ModalOutlineBtn>
-                <ModalFillBtn onClick={handleStopConfirm}>종료하기</ModalFillBtn>
+                <ModalOutlineBtn onClick={() => setStopModal(false)}>
+                  계속할게요
+                </ModalOutlineBtn>
+                <ModalFillBtn onClick={handleStopConfirm}>
+                  종료하기
+                </ModalFillBtn>
               </ModalButtons>
             </ModalBody>
           </Modal>
@@ -512,11 +611,16 @@ export default function ExercisePage() {
               <ModalTitle>다른 운동으로 이동할까요?</ModalTitle>
               <ModalDesc>
                 현재 <strong>{current.title}</strong>을 종료하고{"\n"}
-                <strong>{exercises[switchModal.targetIndex]?.title}</strong>으로 이동합니다.{"\n"}
+                <strong>{exercises[switchModal.targetIndex]?.title}</strong>으로
+                이동합니다.{"\n"}
                 종료된 운동은 다시 실행할 수 없어요.
               </ModalDesc>
               <ModalButtons>
-                <ModalOutlineBtn onClick={() => setSwitchModal({ open: false, targetIndex: 0 })}>
+                <ModalOutlineBtn
+                  onClick={() =>
+                    setSwitchModal({ open: false, targetIndex: 0 })
+                  }
+                >
                   돌아가기
                 </ModalOutlineBtn>
                 <ModalFillBtn onClick={handleSwitchConfirm}>
@@ -526,16 +630,25 @@ export default function ExercisePage() {
             </ModalBody>
           </Modal>
 
-          <Modal isOpen={leaveModal} onClose={() => setLeaveModal(false)} showCloseButton={false}>
+          <Modal
+            isOpen={leaveModal}
+            onClose={() => setLeaveModal(false)}
+            showCloseButton={false}
+          >
             <ModalBody>
               <ModalEmoji>⚠️</ModalEmoji>
               <ModalTitle>운동을 종료하고 나가시겠어요?</ModalTitle>
               <ModalDesc>
-                현재 운동 기록이 중단 처리됩니다.{"\n"}이동 후에는 이 운동 세션을 이어서 진행할 수 없어요.
+                현재 운동 기록이 중단 처리됩니다.{"\n"}이동 후에는 이 운동
+                세션을 이어서 진행할 수 없어요.
               </ModalDesc>
               <ModalButtons>
-                <ModalOutlineBtn onClick={() => setLeaveModal(false)}>계속 운동하기</ModalOutlineBtn>
-                <ModalFillBtn onClick={handleLeaveConfirm}>종료하고 나가기</ModalFillBtn>
+                <ModalOutlineBtn onClick={() => setLeaveModal(false)}>
+                  계속 운동하기
+                </ModalOutlineBtn>
+                <ModalFillBtn onClick={handleLeaveConfirm}>
+                  종료하고 나가기
+                </ModalFillBtn>
               </ModalButtons>
             </ModalBody>
           </Modal>
@@ -547,96 +660,199 @@ export default function ExercisePage() {
 
 // ── Styled ───────────────────────────────────────────────────
 const Container = styled.div`
-  display: flex; flex-direction: column;
-  height: 100%; overflow-y: auto; padding: 24px 16px 120px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  padding: 24px 16px 120px;
 `;
 const Header = styled.div`
-  display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
 `;
 const PageTitle = styled.h1`
   ${({ theme }) => theme.typography.heading2}
-  color: ${({ theme }) => theme.colors.text.primary}; margin: 0;
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin: 0;
 `;
 const VideoBox = styled.div`
-  width: 100%; aspect-ratio: 16/9;
+  width: 100%;
+  aspect-ratio: 16/9;
   border-radius: ${({ theme }) => theme.borderRadius.lg};
-  overflow: hidden; margin-bottom: ${({ theme }) => theme.spacing.md}; flex-shrink: 0;
+  overflow: hidden;
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+  flex-shrink: 0;
 `;
 const StatsRow = styled.div`
-  display: flex; gap: ${({ theme }) => theme.spacing.md}; margin-bottom: ${({ theme }) => theme.spacing.md};
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.md};
+  margin-bottom: ${({ theme }) => theme.spacing.md};
 `;
 const StatCard = styled.div`
-  flex: 1; background: ${({ theme }) => theme.colors.white};
+  flex: 1;
+  background: ${({ theme }) => theme.colors.white};
   border: 1px solid ${({ theme }) => theme.colors.sub};
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   padding: ${({ theme }) => theme.spacing.md};
-  display: flex; flex-direction: column; gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 `;
 const StatLabel = styled.p`
-  ${({ theme }) => theme.typography.caption} color: ${({ theme }) => theme.colors.subtext}; margin: 0;
+  ${({ theme }) => theme.typography.caption} color: ${({ theme }) =>
+    theme.colors.subtext};
+  margin: 0;
 `;
 const StatValue = styled.p`
-  font-size: 30px; font-weight: 700; color: ${({ theme }) => theme.colors.point}; margin: 0; line-height: 1.2;
+  font-size: 30px;
+  font-weight: 700;
+  color: ${({ theme }) => theme.colors.point};
+  margin: 0;
+  line-height: 1.2;
 `;
 const StatUnit = styled.span`
-  ${({ theme }) => theme.typography.body2} color: ${({ theme }) => theme.colors.subtext}; margin-left: 4px;
+  ${({ theme }) => theme.typography.body2} color: ${({ theme }) =>
+    theme.colors.subtext};
+  margin-left: 4px;
 `;
-const ExerciseInfo = styled.div`margin-bottom: ${({ theme }) => theme.spacing.md};`;
+const ExerciseInfo = styled.div`
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+`;
 const ExTitle = styled.h2`
-  ${({ theme }) => theme.typography.heading2} color: ${({ theme }) => theme.colors.text.primary}; margin: 0 0 4px;
+  ${({ theme }) => theme.typography.heading2} color: ${({ theme }) =>
+    theme.colors.text.primary};
+  margin: 0 0 4px;
 `;
 const ExMeta = styled.p`
-  ${({ theme }) => theme.typography.body2} color: ${({ theme }) => theme.colors.subtext}; margin: 0;
+  ${({ theme }) => theme.typography.body2} color: ${({ theme }) =>
+    theme.colors.subtext};
+  margin: 0;
 `;
 const ControlRow = styled.div`
-  display: flex; gap: ${({ theme }) => theme.spacing.sm}; margin-bottom: ${({ theme }) => theme.spacing.lg};
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.sm};
+  margin-bottom: ${({ theme }) => theme.spacing.lg};
 `;
 const ActionButton = styled.button<{ $variant?: "outline" | "danger" }>`
-  flex: 1; height: 60px;
+  flex: 1;
+  height: 60px;
   border-radius: ${({ theme }) => theme.borderRadius.md};
-  ${({ theme }) => theme.typography.button} cursor: pointer; transition: all 0.2s;
+  ${({ theme }) => theme.typography.button} cursor: pointer;
+  transition: all 0.2s;
   ${({ $variant, theme }) => {
     switch ($variant) {
-      case "outline": return `background:transparent;border:1.5px solid ${theme.colors.point};color:${theme.colors.point};&:hover{background:${theme.colors.light};}`;
-      case "danger": return `background:${theme.colors.point};border:none;color:${theme.colors.white};&:hover{filter:brightness(0.92);}`;
-      default: return `background:${theme.colors.light};border:1px solid ${theme.colors.point};color:${theme.colors.point};&:hover{background:${theme.colors.sub};}`;
+      case "outline":
+        return `background:transparent;border:1.5px solid ${theme.colors.point};color:${theme.colors.point};&:hover{background:${theme.colors.light};}`;
+      case "danger":
+        return `background:${theme.colors.point};border:none;color:${theme.colors.white};&:hover{filter:brightness(0.92);}`;
+      default:
+        return `background:${theme.colors.light};border:1px solid ${theme.colors.point};color:${theme.colors.point};&:hover{background:${theme.colors.sub};}`;
     }
   }}
-  &:disabled { opacity: 0.55; cursor: not-allowed; }
-  &:active { transform: scale(0.98); }
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  &:active {
+    transform: scale(0.98);
+  }
 `;
-const ListSection = styled.div`display:flex;flex-direction:column;gap:${({ theme }) => theme.spacing.sm};`;
+const ListSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
 const ListTitle = styled.h3`
-  ${({ theme }) => theme.typography.body2} color:${({ theme }) => theme.colors.subtext};
-  margin:0 0 ${({ theme }) => theme.spacing.sm};
+  ${({ theme }) => theme.typography.body2} color:${({ theme }) =>
+    theme.colors.subtext};
+  margin: 0 0 ${({ theme }) => theme.spacing.sm};
 `;
 const EmergencyStop = styled.button`
-  width:100%;margin-top:${({ theme }) => theme.spacing.lg};padding:18px 16px 14px;
-  background:#fff5f5;border:2px solid #e53935;border-radius:${({ theme }) => theme.borderRadius.lg};
-  color:#e53935;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;
-  ${({ theme }) => theme.typography.caption}font-weight:500;transition:all 0.2s;
-  &:hover{background:#ffebee;}&:active{transform:scale(0.98);}
+  width: 100%;
+  margin-top: ${({ theme }) => theme.spacing.lg};
+  padding: 18px 16px 14px;
+  background: #fff5f5;
+  border: 2px solid #e53935;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  color: #e53935;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  ${({ theme }) => theme.typography.caption}font-weight:500;
+  transition: all 0.2s;
+  &:hover {
+    background: #ffebee;
+  }
+  &:active {
+    transform: scale(0.98);
+  }
 `;
-const EmergencyStopLabel = styled.span`font-size:17px;font-weight:700;color:#e53935;letter-spacing:-0.3px;`;
-const ModalBody = styled.div`display:flex;flex-direction:column;align-items:center;gap:${({ theme }) => theme.spacing.sm};text-align:center;`;
-const ModalEmoji = styled.span`font-size:40px;`;
-const ModalTitle = styled.p`${({ theme }) => theme.typography.heading3}color:${({ theme }) => theme.colors.text.primary};margin:0;`;
-const ModalDesc = styled.p`${({ theme }) => theme.typography.body2}color:${({ theme }) => theme.colors.subtext};margin:0;white-space:pre-line;`;
-const ModalButtons = styled.div`display:flex;gap:${({ theme }) => theme.spacing.sm};width:100%;margin-top:${({ theme }) => theme.spacing.sm};`;
+const EmergencyStopLabel = styled.span`
+  font-size: 17px;
+  font-weight: 700;
+  color: #e53935;
+  letter-spacing: -0.3px;
+`;
+const ModalBody = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.sm};
+  text-align: center;
+`;
+const ModalEmoji = styled.span`
+  font-size: 40px;
+`;
+const ModalTitle = styled.p`
+  ${({ theme }) => theme.typography.heading3}color:${({ theme }) =>
+    theme.colors.text.primary};
+  margin: 0;
+`;
+const ModalDesc = styled.p`
+  ${({ theme }) => theme.typography.body2}color:${({ theme }) =>
+    theme.colors.subtext};
+  margin: 0;
+  white-space: pre-line;
+`;
+const ModalButtons = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.sm};
+  width: 100%;
+  margin-top: ${({ theme }) => theme.spacing.sm};
+`;
 const ModalOutlineBtn = styled.button`
-  flex:1;padding:12px;border-radius:${({ theme }) => theme.borderRadius.md};
-  border:1.5px solid ${({ theme }) => theme.colors.point};background:transparent;
-  color:${({ theme }) => theme.colors.point};${({ theme }) => theme.typography.button}cursor:pointer;
-  &:hover{background:${({ theme }) => theme.colors.light};}
+  flex: 1;
+  padding: 12px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  border: 1.5px solid ${({ theme }) => theme.colors.point};
+  background: transparent;
+  color: ${({ theme }) => theme.colors.point};
+  ${({ theme }) => theme.typography.button}cursor:pointer;
+  &:hover {
+    background: ${({ theme }) => theme.colors.light};
+  }
 `;
 const ModalFillBtn = styled.button`
-  flex:1;padding:12px;border-radius:${({ theme }) => theme.borderRadius.md};border:none;
-  background:${({ theme }) => theme.colors.point};color:${({ theme }) => theme.colors.white};
-  ${({ theme }) => theme.typography.button}cursor:pointer;&:hover{filter:brightness(0.92);}
+  flex: 1;
+  padding: 12px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  border: none;
+  background: ${({ theme }) => theme.colors.point};
+  color: ${({ theme }) => theme.colors.white};
+  ${({ theme }) => theme.typography.button}cursor:pointer;
+  &:hover {
+    filter: brightness(0.92);
+  }
 `;
 const ExerciseItemWrapper = styled.div<{ $isEnded: boolean }>`
-  opacity:${({ $isEnded }) => ($isEnded ? 0.45 : 1)};
-  filter:${({ $isEnded }) => ($isEnded ? "grayscale(0.4)" : "none")};
-  pointer-events:${({ $isEnded }) => ($isEnded ? "none" : "auto")};
-  transition:opacity 0.2s ease,filter 0.2s ease;
+  opacity: ${({ $isEnded }) => ($isEnded ? 0.45 : 1)};
+  filter: ${({ $isEnded }) => ($isEnded ? "grayscale(0.4)" : "none")};
+  pointer-events: ${({ $isEnded }) => ($isEnded ? "none" : "auto")};
+  transition:
+    opacity 0.2s ease,
+    filter 0.2s ease;
 `;

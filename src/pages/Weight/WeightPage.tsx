@@ -253,7 +253,7 @@ export default function WeightPage() {
       {/* 이번 주 요약 카드 */}
       <SummaryCard>
         <SectionLabel>이번 주 요약</SectionLabel>
-        {currentWeek <= 113 && (
+        {currentWeek <= 13 && (
           <EarlyPregnancyTip>
             💡 <b>임신 1분기(초기) 안내</b>
             <br />이 시기에는 입덧과 식욕 저하 등으로 체중이 일시적으로

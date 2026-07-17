@@ -46,6 +46,13 @@ interface HeartRateRecord {
   bpm: number;
 }
 
+interface WeeklyHeartRateResponse {
+  average: number | null;
+  max: number | null;
+  count: number;
+  records: HeartRateRecord[];
+}
+
 interface ExerciseHistoryResponse {
   sessions: {
     session_id: number;
@@ -53,7 +60,7 @@ interface ExerciseHistoryResponse {
   }[];
 }
 
-const DAYS = ["월", "화", "수", "목", "금", "토", "오늘"] as const;
+const WEEK_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -90,9 +97,14 @@ export default function MyPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState<UserInfo | null>(null);
   const [pregnancy, setPregnancy] = useState<PregnancyInfo | null>(null);
-  const [weeklyHR, setWeeklyHR] = useState<DailyHeartRate[]>(
-    DAYS.map((day) => ({ day, bpm: null })),
-  );
+  const [weeklyHR, setWeeklyHR] = useState<DailyHeartRate[]>(() => {
+    const today = new Date();
+    const dow = today.getDay() === 0 ? 6 : today.getDay() - 1;
+    return WEEK_DAYS.map((day, i) => ({
+      day: i === dow ? "오늘" : day,
+      bpm: null,
+    }));
+  });
   const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [exerciseCount, setExerciseCount] = useState(0);
@@ -128,29 +140,28 @@ export default function MyPage() {
   // ── 주간 심박수: GET /heart-rate/weekly ───────────────────
   const loadHeartRate = useCallback(async () => {
     try {
-      const data = await getJson<HeartRateRecord[]>("/heart-rate/weekly");
+      const res = await getJson<WeeklyHeartRateResponse>("/heart-rate/weekly");
+      const data = res.records;
       const today = new Date();
 
-      // ✅ Fix: 이번 주 월요일을 기준점으로 고정한 뒤 i일씩 더함
-      // 기존 코드는 평일에 실행하면 i가 커질수록 미래 날짜가 되는 버그가 있었음
-      // 예) 월요일(dow=1)에 실행: i=1(화) → today+1(내일), i=5(토) → today+5(5일 후)
       const monday = new Date(today);
       const dow = today.getDay() === 0 ? 7 : today.getDay(); // 일요일=0 → 7로 변환
       monday.setDate(today.getDate() - dow + 1); // 이번 주 월요일
       monday.setHours(0, 0, 0, 0);
 
-      const mapped: DailyHeartRate[] = DAYS.map((day, i) => {
-        if (day === "오늘") {
-          const rec = data.find((r) => isToday(r.date));
-          return { day, bpm: rec?.bpm ?? null };
-        }
-        // i=0: 월, i=1: 화, ..., i=5: 토 → 항상 이번 주 과거/현재 날짜
+      const currentDowIndex = dow - 1; // 배열 인덱스용 (0: 월 ~ 6: 일)
+
+      const mapped: DailyHeartRate[] = WEEK_DAYS.map((dayName, i) => {
+        const displayDay = i === currentDowIndex ? "오늘" : dayName;
+
         const target = new Date(monday);
         target.setDate(monday.getDate() + i);
+
         const rec = data.find(
           (r) => new Date(r.date).toDateString() === target.toDateString(),
         );
-        return { day, bpm: rec?.bpm ?? null };
+
+        return { day: displayDay, bpm: rec?.bpm ?? null };
       });
 
       setWeeklyHR(mapped);
