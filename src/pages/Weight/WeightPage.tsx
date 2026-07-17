@@ -34,6 +34,7 @@ interface WeightResponse {
   logs: WeightLog[];
 }
 
+// 💡 백엔드 스펙에 맞춘 인터페이스 구조
 interface WeightTrend {
   based_on?: string;
   slope?: number;
@@ -60,7 +61,7 @@ type StatusType = "normal" | "excessive" | "warning";
 const getStatusType = (status?: string): StatusType => {
   if (!status) return "warning";
   if (status.includes("정상")) return "normal";
-  if (status.includes("과도")) return "excessive";
+  if (status.includes("과도") || status.includes("초과")) return "excessive";
 
   return "warning";
 };
@@ -79,7 +80,6 @@ export default function WeightPage() {
   const [pregnancyError, setPregnancyError] = useState(false);
   const [trend, setTrend] = useState<WeightTrend | null>(null);
 
-  // 임신 주차 조회
   const fetchPregnancyInfo = async () => {
     try {
       const res = await getJson<PregnancyInfo>("/pregnancy/me");
@@ -93,7 +93,6 @@ export default function WeightPage() {
     }
   };
 
-  // 체중 데이터 조회
   const fetchWeight = async (week?: number) => {
     try {
       const [weightRes, trendRes] = await Promise.allSettled([
@@ -122,9 +121,7 @@ export default function WeightPage() {
         setLogs(mappedLogs);
 
         const targetWeek = week ?? selectedWeek;
-
         const log = mappedLogs.find((l) => l.week === targetWeek);
-
         setCardState(log ? "saved" : "input");
       } else {
         setError("데이터를 불러오지 못했어요. 다시 시도해주세요.");
@@ -142,7 +139,6 @@ export default function WeightPage() {
         };
 
         console.log("[trend response]", mappedTrend);
-
         setTrend(mappedTrend);
       }
     } catch (e) {
@@ -180,7 +176,6 @@ export default function WeightPage() {
 
   const thisWeekLog = logs.find((l) => l.week === selectedWeek);
 
-  // cardState 'saved'인데 해당 주차 로그 없으면 'input'으로 복구
   useEffect(() => {
     if (cardState === "saved" && !thisWeekLog) {
       setCardState("input");
@@ -203,7 +198,6 @@ export default function WeightPage() {
   const minW = weights.length ? Math.floor(Math.min(...weights)) - 2 : 40;
   const maxW = weights.length ? Math.ceil(Math.max(...weights)) + 2 : 90;
 
-  // 신규 저장
   const handleSave = async () => {
     const val = parseFloat(inputValue);
     if (isNaN(val) || val <= 0 || isSubmitting || pregnancyError) return;
@@ -220,14 +214,12 @@ export default function WeightPage() {
     }
   };
 
-  // 수정 시작
   const handleEdit = () => {
     setEditValue(String(thisWeekLog?.weight ?? ""));
     setError(null);
     setCardState("editing");
   };
 
-  // 수정 저장
   const handleUpdate = async () => {
     const val = parseFloat(editValue);
     if (isNaN(val) || val <= 0 || isSubmitting || pregnancyError) return;
@@ -261,7 +253,7 @@ export default function WeightPage() {
       {/* 이번 주 요약 카드 */}
       <SummaryCard>
         <SectionLabel>이번 주 요약</SectionLabel>
-        {currentWeek <= 13 && (
+        {currentWeek <= 113 && (
           <EarlyPregnancyTip>
             💡 <b>임신 1분기(초기) 안내</b>
             <br />이 시기에는 입덧과 식욕 저하 등으로 체중이 일시적으로
@@ -277,7 +269,11 @@ export default function WeightPage() {
           </GainValue>
         </GainRow>
         {trend && (
-          <TrendCard statusType={getStatusType(trend?.status)}>
+          <TrendCard
+            statusType={getStatusType(
+              trend?.slope_status ?? trend?.current_position?.status,
+            )}
+          >
             <TrendRow>
               <TrendItem>
                 <TrendLabel>최근 4주 평균 증가량</TrendLabel>
@@ -762,11 +758,12 @@ const WeekSelect = styled.select`
 `;
 
 const EarlyPregnancyTip = styled.div`
-  background: ${({ theme }) => theme.colors.light || "#faf5f3"};
+  background: #faf5f3;
   border-radius: ${({ theme }) => theme.borderRadius.md};
   padding: ${({ theme }) => theme.spacing.md};
   font-size: 12px;
   line-height: 1.6;
   color: ${({ theme }) => theme.colors.subtext || "#8b7e74"};
   border: 1px dashed ${({ theme }) => theme.colors.sub || "#f0e8e5"};
+  margin-top: 4px;
 `;
