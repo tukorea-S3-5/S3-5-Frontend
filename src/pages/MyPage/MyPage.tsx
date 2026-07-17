@@ -1,13 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import ProfileSection from "./components/ProfileSection";
 import PregnancyInfoCard from "./components/PregnancyInfoCard";
 import HeartRateCard, { DailyHeartRate } from "./components/HeartRateCard";
 import PostsTab from "./components/PostsTab";
 import RestingHeartRateModal from "../../components/RestingHeartRateModal";
 import styles from "./MyPage.module.css";
-import { getJson, putJson } from "../../api/http";
+import { getJson, putJson, setAccessToken } from "../../api/http";
 import NameEditModal from "./components/NameEditModal";
 import PregnancyEditModal from "./components/PregnancyEditModal";
+import { logout } from "@/api/auth";
 
 // ── 타입 ──────────────────────────────────────────────────────
 interface PregnancyInfo {
@@ -85,6 +87,7 @@ function isToday(dateStr: string) {
 
 // ── Page ──────────────────────────────────────────────────────
 export default function MyPage() {
+  const navigate = useNavigate();
   const [user, setUser] = useState<UserInfo | null>(null);
   const [pregnancy, setPregnancy] = useState<PregnancyInfo | null>(null);
   const [weeklyHR, setWeeklyHR] = useState<DailyHeartRate[]>(
@@ -259,6 +262,23 @@ export default function MyPage() {
     }
   };
 
+  // 로그아웃 핸들러
+  const handleLogout = async () => {
+    if (window.confirm("로그아웃 하시겠습니까?")) {
+      try {
+        await logout(); // 백엔드 세션/쿠키 무효화 요청
+      } catch (e) {
+        console.error("[MyPage] 서버 로그아웃 요청 실패:", e);
+      } finally {
+        // 1. 프론트엔드 메모리 토큰 비우기
+        setAccessToken(null);
+
+        // 2. 직접 로그아웃한 것이므로 메인('/') 페이지로 이동
+        navigate("/");
+      }
+    }
+  };
+
   return (
     <div className={styles.page}>
       <ProfileSection
@@ -291,6 +311,16 @@ export default function MyPage() {
         />
 
         <PostsTab posts={myPosts} likedPosts={likedPosts} />
+
+        <div className={styles.logoutContainer}>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={styles.logoutButton}
+          >
+            로그아웃
+          </button>
+        </div>
       </div>
 
       <NameEditModal

@@ -22,6 +22,7 @@ import ExerciseListPage from "./pages/ExerciseList/ExerciseListPage";
 import MyPage from "./pages/MyPage";
 import CommunityPage from "./pages/Community/CommunityPage";
 import CommunityDetailPage from "./pages/Community/CommunityDetailPage";
+import PublicRoute from "./routes/PublicRoute";
 
 function App() {
   return (
@@ -79,16 +80,19 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route element={<Layout showHeader={false} showBottomNav={false} />}>
-        {/* 공개 라우트 */}
-        <Route path="/" element={<SplashPage />} />
-        <Route path="onboarding">
-          <Route path="safety" element={<SafetyCheckPage />} />
-          <Route path="expert" element={<ExpertConsultPage />} />
-        </Route>
-        <Route path="auth">
-          <Route path="login" element={<LoginPage />} />
-          <Route path="signup" element={<SignupPage />} />
+      {/* 공개 라우트 */}
+      <Route element={<PublicRoute />}>
+        <Route element={<Layout showHeader={false} showBottomNav={false} />}>
+          {/* 토큰이 있을 때 / 로 진입하면 위 가드에 의해 /home 으로 이동 */}
+          <Route path="/" element={<SplashPage />} />
+          <Route path="onboarding">
+            <Route path="safety" element={<SafetyCheckPage />} />
+            <Route path="expert" element={<ExpertConsultPage />} />
+          </Route>
+          <Route path="auth">
+            <Route path="login" element={<LoginPage />} />
+            <Route path="signup" element={<SignupPage />} />
+          </Route>
         </Route>
       </Route>
 

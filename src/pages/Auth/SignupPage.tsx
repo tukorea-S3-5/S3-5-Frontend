@@ -99,7 +99,7 @@ export default function SignupPage() {
               type="email"
               value={email}
               onChange={setEmail}
-              placeholder="test@tukorea.ac.kr"
+              placeholder="example@email.com"
               autoComplete="email"
             />
 
@@ -108,7 +108,7 @@ export default function SignupPage() {
               type="password"
               value={password}
               onChange={setPassword}
-              placeholder="비밀번호"
+              placeholder="영문/숫자 조합 8자 이상"
               autoComplete="new-password"
             />
 

@@ -57,7 +57,7 @@ type StatusType = "normal" | "excessive" | "warning";
 
 const getStatusType = (status?: string): StatusType => {
   if (!status) return "warning";
-  if (status === "정상 증가 추세") return "normal";
+  if (status.includes("정상")) return "normal";
   if (status.includes("과도")) return "excessive";
 
   return "warning";
