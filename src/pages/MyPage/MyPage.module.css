@@ -492,3 +492,39 @@
 .postItem:active {
   transform: scale(0.99);
 }
+
+/* 마이페이지 최하단에 정중앙 배치 */
+.logoutContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-bottom: 20px; /* 스크롤 최하단 안전 마진 */
+}
+
+.logoutButton {
+  background: none;
+  border: none;
+  outline: none;
+  cursor: pointer;
+
+  /* 테마 기반 스타일 대입 */
+  color: #6b6b6b; /* theme.colors.subtext */
+  font-size: 12px; /* theme.fontSize.xs */
+  font-family:
+    "Apple SD Gothic Neo",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  font-weight: 400;
+  text-decoration: underline; /* 텍스트 링크 느낌 */
+  transition: opacity 0.2s ease;
+  padding: 8px 16px;
+}
+
+.logoutButton:hover {
+  opacity: 0.8; /* 살짝 흐려지는 효과 */
+}
+
+.logoutButton:active {
+  opacity: 0.5;
+}

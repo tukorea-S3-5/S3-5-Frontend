@@ -34,11 +34,10 @@ interface WeightResponse {
   logs: WeightLog[];
 }
 
+// 💡 백엔드 스펙에 맞춘 인터페이스 구조
 interface WeightTrend {
   based_on?: string;
   slope?: number;
-  expected_slope?: number;
-  status?: string;
   slope_status?: string;
   current_position?: {
     range?: {
@@ -46,6 +45,10 @@ interface WeightTrend {
       max: number;
     };
     status?: string;
+  };
+  recommended_weekly_range?: {
+    min: number;
+    max: number;
   };
 }
 
@@ -57,8 +60,8 @@ type StatusType = "normal" | "excessive" | "warning";
 
 const getStatusType = (status?: string): StatusType => {
   if (!status) return "warning";
-  if (status === "정상 증가 추세") return "normal";
-  if (status.includes("과도")) return "excessive";
+  if (status.includes("정상")) return "normal";
+  if (status.includes("과도") || status.includes("초과")) return "excessive";
 
   return "warning";
 };
@@ -77,7 +80,6 @@ export default function WeightPage() {
   const [pregnancyError, setPregnancyError] = useState(false);
   const [trend, setTrend] = useState<WeightTrend | null>(null);
 
-  // 임신 주차 조회
   const fetchPregnancyInfo = async () => {
     try {
       const res = await getJson<PregnancyInfo>("/pregnancy/me");
@@ -91,7 +93,6 @@ export default function WeightPage() {
     }
   };
 
-  // 체중 데이터 조회
   const fetchWeight = async (week?: number) => {
     try {
       const [weightRes, trendRes] = await Promise.allSettled([
@@ -120,9 +121,7 @@ export default function WeightPage() {
         setLogs(mappedLogs);
 
         const targetWeek = week ?? selectedWeek;
-
         const log = mappedLogs.find((l) => l.week === targetWeek);
-
         setCardState(log ? "saved" : "input");
       } else {
         setError("데이터를 불러오지 못했어요. 다시 시도해주세요.");
@@ -134,16 +133,12 @@ export default function WeightPage() {
         const mappedTrend: WeightTrend = {
           based_on: trendData?.based_on ?? "",
           slope: trendData?.slope ?? 0,
-          expected_slope: trendData?.expected_slope,
-          status:
-            trendData?.slope_status ??
-            trendData?.current_position?.status ??
-            trendData?.status ??
-            "",
+          slope_status: trendData?.slope_status ?? "",
+          current_position: trendData?.current_position,
+          recommended_weekly_range: trendData?.recommended_weekly_range,
         };
 
         console.log("[trend response]", mappedTrend);
-
         setTrend(mappedTrend);
       }
     } catch (e) {
@@ -181,7 +176,6 @@ export default function WeightPage() {
 
   const thisWeekLog = logs.find((l) => l.week === selectedWeek);
 
-  // cardState 'saved'인데 해당 주차 로그 없으면 'input'으로 복구
   useEffect(() => {
     if (cardState === "saved" && !thisWeekLog) {
       setCardState("input");
@@ -204,7 +198,6 @@ export default function WeightPage() {
   const minW = weights.length ? Math.floor(Math.min(...weights)) - 2 : 40;
   const maxW = weights.length ? Math.ceil(Math.max(...weights)) + 2 : 90;
 
-  // 신규 저장
   const handleSave = async () => {
     const val = parseFloat(inputValue);
     if (isNaN(val) || val <= 0 || isSubmitting || pregnancyError) return;
@@ -221,14 +214,12 @@ export default function WeightPage() {
     }
   };
 
-  // 수정 시작
   const handleEdit = () => {
     setEditValue(String(thisWeekLog?.weight ?? ""));
     setError(null);
     setCardState("editing");
   };
 
-  // 수정 저장
   const handleUpdate = async () => {
     const val = parseFloat(editValue);
     if (isNaN(val) || val <= 0 || isSubmitting || pregnancyError) return;
@@ -262,6 +253,13 @@ export default function WeightPage() {
       {/* 이번 주 요약 카드 */}
       <SummaryCard>
         <SectionLabel>이번 주 요약</SectionLabel>
+        {currentWeek <= 113 && (
+          <EarlyPregnancyTip>
+            💡 <b>임신 1분기(초기) 안내</b>
+            <br />이 시기에는 입덧과 식욕 저하 등으로 체중이 일시적으로
+            감소하거나 변화가 적을 수 있으니 안심하셔도 괜찮아요!
+          </EarlyPregnancyTip>
+        )}
         <GainRow>
           <GainLabel>총 증가량</GainLabel>
           <GainValue>
@@ -271,7 +269,11 @@ export default function WeightPage() {
           </GainValue>
         </GainRow>
         {trend && (
-          <TrendCard statusType={getStatusType(trend?.status)}>
+          <TrendCard
+            statusType={getStatusType(
+              trend?.slope_status ?? trend?.current_position?.status,
+            )}
+          >
             <TrendRow>
               <TrendItem>
                 <TrendLabel>최근 4주 평균 증가량</TrendLabel>
@@ -283,22 +285,22 @@ export default function WeightPage() {
               <TrendItem>
                 <TrendLabel>임신 평균 권장 증가량</TrendLabel>
                 <TrendValue>
-                  {trend.expected_slope != null
-                    ? `${trend.expected_slope.toFixed(2)}kg`
+                  {trend.recommended_weekly_range
+                    ? `${trend.recommended_weekly_range.min.toFixed(2)} ~ ${trend.recommended_weekly_range.max.toFixed(2)}kg`
                     : "-"}
                   <TrendUnit>/주</TrendUnit>
                 </TrendValue>
               </TrendItem>
             </TrendRow>
-            <TrendStatus statusType={getStatusType(trend?.status)}>
-              {trend.status || "상태 정보를 불러오는 중입니다."}
+            <TrendStatus
+              statusType={getStatusType(
+                trend?.slope_status ?? trend?.current_position?.status,
+              )}
+            >
+              {trend.slope_status ||
+                trend.current_position?.status ||
+                "상태 정보를 불러오는 중입니다."}
             </TrendStatus>
-            {trend.status?.includes("1분기") && (
-              <TrendDescription>
-                💡 1분기에는 입덧 등으로 체중이 일시적으로 감소하거나 변화가
-                적을 수 있어요.
-              </TrendDescription>
-            )}
           </TrendCard>
         )}
       </SummaryCard>
@@ -755,8 +757,13 @@ const WeekSelect = styled.select`
   }
 `;
 
-const TrendDescription = styled.p`
-  font-size: 11px;
-  margin: 0;
-  color: ${({ theme }) => theme.colors.subtext};
+const EarlyPregnancyTip = styled.div`
+  background: #faf5f3;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  padding: ${({ theme }) => theme.spacing.md};
+  font-size: 12px;
+  line-height: 1.6;
+  color: ${({ theme }) => theme.colors.subtext || "#8b7e74"};
+  border: 1px dashed ${({ theme }) => theme.colors.sub || "#f0e8e5"};
+  margin-top: 4px;
 `;
