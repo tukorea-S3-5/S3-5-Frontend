@@ -34,7 +34,6 @@ interface WeightResponse {
   logs: WeightLog[];
 }
 
-// 💡 백엔드 스펙에 맞춘 인터페이스 구조
 interface WeightTrend {
   based_on?: string;
   slope?: number;
@@ -52,8 +51,13 @@ interface WeightTrend {
   };
 }
 
+interface HealthReportResponse {
+  report: string;
+}
+
 interface PregnancyInfo {
   week: number;
+  bmi?: number;
 }
 
 type StatusType = "normal" | "excessive" | "warning";
@@ -79,21 +83,13 @@ export default function WeightPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pregnancyError, setPregnancyError] = useState(false);
   const [trend, setTrend] = useState<WeightTrend | null>(null);
+  const [userBmi, setUserBmi] = useState<number>(22.5);
+  const [healthReport, setHealthReport] = useState<string | null>(null);
+  const [isReportLoading, setIsReportLoading] = useState(false);
 
-  const fetchPregnancyInfo = async () => {
-    try {
-      const res = await getJson<PregnancyInfo>("/pregnancy/me");
-      setCurrentWeek(res.week);
-      setSelectedWeek(res.week);
-      setPregnancyError(false);
-      return res.week;
-    } catch {
-      setPregnancyError(true);
-      throw new Error("임신 정보를 불러올 수 없습니다.");
-    }
-  };
+  const fetchWeight = async (week?: number, passedBmi?: number) => {
+    setHealthReport(null);
 
-  const fetchWeight = async (week?: number) => {
     try {
       const [weightRes, trendRes] = await Promise.allSettled([
         getJson<WeightResponse>("/pregnancy/weight"),
@@ -140,6 +136,27 @@ export default function WeightPage() {
 
         console.log("[trend response]", mappedTrend);
         setTrend(mappedTrend);
+
+        const targetBmi = passedBmi ?? userBmi;
+        const targetWeek = week ?? selectedWeek;
+        const status = trendData?.current_position?.status || "정상 범위";
+
+        setIsReportLoading(true);
+        try {
+          const aiRes = await postJson<HealthReportResponse>(
+            "/ai/health-report",
+            {
+              week: targetWeek,
+              bmi: targetBmi,
+              weightStatus: status,
+            },
+          );
+          setHealthReport(aiRes.report);
+        } catch (e) {
+          console.error("AI 리포트 호출 실패", e);
+        } finally {
+          setIsReportLoading(false);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -153,9 +170,16 @@ export default function WeightPage() {
     setPregnancyError(false);
     setLoading(true);
     try {
-      const week = await fetchPregnancyInfo();
-      await fetchWeight(week);
+      const res = await getJson<PregnancyInfo>("/pregnancy/me");
+      setCurrentWeek(res.week);
+      setSelectedWeek(res.week);
+
+      const fetchedBmi = res.bmi || 22.5;
+      setUserBmi(fetchedBmi);
+
+      await fetchWeight(res.week, fetchedBmi);
     } catch {
+      setPregnancyError(true);
       setLoading(false);
     }
   };
@@ -252,22 +276,29 @@ export default function WeightPage() {
     <Container>
       {/* 이번 주 요약 카드 */}
       <SummaryCard>
-        <SectionLabel>이번 주 요약</SectionLabel>
-        {currentWeek <= 13 && (
-          <EarlyPregnancyTip>
-            💡 <b>임신 1분기(초기) 안내</b>
-            <br />이 시기에는 입덧과 식욕 저하 등으로 체중이 일시적으로
-            감소하거나 변화가 적을 수 있으니 안심하셔도 괜찮아요!
-          </EarlyPregnancyTip>
-        )}
-        <GainRow>
-          <GainLabel>총 증가량</GainLabel>
-          <GainValue>
+        <RecordTitle>이번 주 요약</RecordTitle>
+        <MainStatArea>
+          <StatTitle>현재까지 총 증가량</StatTitle>
+          <StatValue>
             {totalGain !== null
-              ? `${totalGain >= 0 ? "+" : ""}${totalGain.toFixed(1)}kg`
+              ? `${totalGain >= 0 ? "+" : ""}${totalGain.toFixed(1)}`
               : "-"}
-          </GainValue>
-        </GainRow>
+            <span className="unit">kg</span>
+          </StatValue>
+
+          {trend?.current_position?.range && (
+            <SubStatText>
+              이번 주 목표: {trend.current_position.range.min} ~{" "}
+              {trend.current_position.range.max}kg
+              <StatusBadge
+                statusType={getStatusType(trend.current_position.status)}
+              >
+                {trend.current_position.status}
+              </StatusBadge>
+            </SubStatText>
+          )}
+        </MainStatArea>
+
         {trend && (
           <TrendCard
             statusType={getStatusType(
@@ -303,6 +334,24 @@ export default function WeightPage() {
             </TrendStatus>
           </TrendCard>
         )}
+        {isReportLoading ? (
+          <AiReportCard>
+            <AiIcon>⏳</AiIcon>
+            <AiReportContent>
+              <AiText style={{ color: "#8b7e74" }}>
+                MOMI AI가 건강 리포트를 작성 중입니다...
+              </AiText>
+            </AiReportContent>
+          </AiReportCard>
+        ) : healthReport ? (
+          <AiReportCard>
+            <AiIcon>✨</AiIcon>
+            <AiReportContent>
+              <AiTitle>MOMI 주간 건강 리포트</AiTitle>
+              <AiText>{healthReport}</AiText>
+            </AiReportContent>
+          </AiReportCard>
+        ) : null}
       </SummaryCard>
 
       {/* 체중 기록 카드 */}
@@ -504,28 +553,7 @@ const SummaryCard = styled.div`
   flex-direction: column;
   gap: ${({ theme }) => theme.spacing.md};
 `;
-const SectionLabel = styled.p`
-  ${({ theme }) => theme.typography.caption}
-  color: ${({ theme }) => theme.colors.subtext};
-  margin: 0 0 ${({ theme }) => theme.spacing.sm} 0;
-`;
-const GainRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: ${({ theme }) => theme.colors.light};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
-`;
-const GainLabel = styled.span`
-  ${({ theme }) => theme.typography.body2}
-  color: ${({ theme }) => theme.colors.text.primary};
-`;
-const GainValue = styled.span`
-  ${({ theme }) => theme.typography.body1}
-  font-weight: 700;
-  color: ${({ theme }) => theme.colors.point};
-`;
+
 const RecordCard = styled.div`
   background: ${({ theme }) => theme.colors.white};
   border-radius: ${({ theme }) => theme.borderRadius.lg};
@@ -757,13 +785,96 @@ const WeekSelect = styled.select`
   }
 `;
 
-const EarlyPregnancyTip = styled.div`
-  background: #faf5f3;
+const StatusBadge = styled.span<{ statusType: StatusType }>`
+  padding: 4px 8px;
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
+  font-size: 11px;
+  font-weight: 700;
+  background: ${({ statusType }) =>
+    ({
+      normal: "#e8f5e9",
+      excessive: "#ffebee",
+      warning: "#fff8e1",
+    })[statusType]};
+  color: ${({ statusType }) =>
+    ({
+      normal: "#2e7d32",
+      excessive: "#c62828",
+      warning: "#f57f17",
+    })[statusType]};
+`;
+
+const MainStatArea = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* 가운데 정렬로 시선 집중 */
+  padding: ${({ theme }) => theme.spacing.lg} 0;
+  gap: 8px;
+`;
+
+const StatTitle = styled.span`
+  ${({ theme }) => theme.typography.body2}
+  color: ${({ theme }) => theme.colors.subtext};
+`;
+
+const StatValue = styled.div`
+  font-size: 36px;
+  font-weight: 800;
+  color: ${({ theme }) => theme.colors.point}; /* 메인 컬러로 포인트 */
+  line-height: 1;
+
+  .unit {
+    font-size: 18px;
+    font-weight: 600;
+    margin-left: 4px;
+    color: ${({ theme }) => theme.colors.text.primary};
+  }
+`;
+
+const SubStatText = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: ${({ theme }) => theme.colors.text.secondary};
+  background: ${({ theme }) => theme.colors.background};
+  padding: 6px 12px;
+  border-radius: 20px;
+`;
+
+// AI 리포트 스타일
+const AiReportCard = styled.div`
+  display: flex;
+  gap: 12px;
+  background: #f4f6ff; /* 은은한 AI 느낌의 연보라/연파랑 배경 */
   border-radius: ${({ theme }) => theme.borderRadius.md};
   padding: ${({ theme }) => theme.spacing.md};
-  font-size: 12px;
-  line-height: 1.6;
-  color: ${({ theme }) => theme.colors.subtext || "#8b7e74"};
-  border: 1px dashed ${({ theme }) => theme.colors.sub || "#f0e8e5"};
   margin-top: 4px;
+`;
+
+const AiIcon = styled.div`
+  font-size: 18px;
+  line-height: 1;
+  margin-top: 2px;
+`;
+
+const AiReportContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const AiTitle = styled.span`
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b46c1; /* 딥 퍼플 포인트 */
+`;
+
+const AiText = styled.p`
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4a5568;
+  word-break: keep-all;
 `;
