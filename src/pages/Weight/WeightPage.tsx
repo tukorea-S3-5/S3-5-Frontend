@@ -56,6 +56,15 @@ interface PregnancyInfo {
   week: number;
 }
 
+interface HealthReportResponse {
+  report: string;
+}
+
+interface PregnancyInfo {
+  week: number;
+  bmi?: number;
+}
+
 type StatusType = "normal" | "excessive" | "warning";
 
 const getStatusType = (status?: string): StatusType => {
@@ -79,6 +88,8 @@ export default function WeightPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pregnancyError, setPregnancyError] = useState(false);
   const [trend, setTrend] = useState<WeightTrend | null>(null);
+  const [healthReport, setHealthReport] = useState<string | null>(null);
+  const [isReportLoading, setIsReportLoading] = useState(false);
 
   const fetchPregnancyInfo = async () => {
     try {
@@ -93,7 +104,7 @@ export default function WeightPage() {
     }
   };
 
-  const fetchWeight = async (week?: number) => {
+  const fetchWeight = async (week?: number, bmi?: number) => {
     try {
       const [weightRes, trendRes] = await Promise.allSettled([
         getJson<WeightResponse>("/pregnancy/weight"),
@@ -140,6 +151,24 @@ export default function WeightPage() {
 
         console.log("[trend response]", mappedTrend);
         setTrend(mappedTrend);
+
+        const status = trendData?.current_position?.status || "정상 범위";
+        setIsReportLoading(true);
+        try {
+          const aiRes = await postJson<HealthReportResponse>(
+            "/ai/health-report",
+            {
+              week: week,
+              bmi: bmi,
+              weightStatus: status,
+            },
+          );
+          setHealthReport(aiRes.report);
+        } catch (e) {
+          console.error("AI 리포트 호출 실패", e);
+        } finally {
+          setIsReportLoading(false);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -153,9 +182,15 @@ export default function WeightPage() {
     setPregnancyError(false);
     setLoading(true);
     try {
-      const week = await fetchPregnancyInfo();
-      await fetchWeight(week);
+      // 임신 정보를 가져와서 week와 bmi를 넘겨줌
+      const res = await getJson<PregnancyInfo>("/pregnancy/me");
+      setCurrentWeek(res.week);
+      setSelectedWeek(res.week);
+
+      const userBmi = res.bmi;
+      await fetchWeight(res.week, userBmi);
     } catch {
+      setPregnancyError(true);
       setLoading(false);
     }
   };
@@ -310,13 +345,24 @@ export default function WeightPage() {
             </TrendStatus>
           </TrendCard>
         )}
-        {currentWeek <= 13 && (
-          <EarlyPregnancyTip>
-            💡 <b>임신 1분기(초기) 안내</b>
-            <br />이 시기에는 입덧과 식욕 저하 등으로 체중이 일시적으로
-            감소하거나 변화가 적을 수 있으니 안심하셔도 괜찮아요!
-          </EarlyPregnancyTip>
-        )}
+        {isReportLoading ? (
+          <AiReportCard>
+            <AiIcon>⏳</AiIcon>
+            <AiReportContent>
+              <AiText style={{ color: "#8b7e74" }}>
+                MOMI AI가 건강 리포트를 작성 중입니다...
+              </AiText>
+            </AiReportContent>
+          </AiReportCard>
+        ) : healthReport ? (
+          <AiReportCard>
+            <AiIcon>✨</AiIcon>
+            <AiReportContent>
+              <AiTitle>MOMI 주간 건강 리포트</AiTitle>
+              <AiText>{healthReport}</AiText>
+            </AiReportContent>
+          </AiReportCard>
+        ) : null}
       </SummaryCard>
 
       {/* 체중 기록 카드 */}
@@ -817,4 +863,40 @@ const SubStatText = styled.div`
   background: ${({ theme }) => theme.colors.background};
   padding: 6px 12px;
   border-radius: 20px;
+`;
+
+// AI 리포트 스타일
+const AiReportCard = styled.div`
+  display: flex;
+  gap: 12px;
+  background: #f4f6ff; /* 은은한 AI 느낌의 연보라/연파랑 배경 */
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  padding: ${({ theme }) => theme.spacing.md};
+  margin-top: 4px;
+`;
+
+const AiIcon = styled.div`
+  font-size: 18px;
+  line-height: 1;
+  margin-top: 2px;
+`;
+
+const AiReportContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const AiTitle = styled.span`
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b46c1; /* 딥 퍼플 포인트 */
+`;
+
+const AiText = styled.p`
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4a5568;
+  word-break: keep-all;
 `;
