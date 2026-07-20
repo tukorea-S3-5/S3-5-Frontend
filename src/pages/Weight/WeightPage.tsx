@@ -34,7 +34,6 @@ interface WeightResponse {
   logs: WeightLog[];
 }
 
-// 💡 백엔드 스펙에 맞춘 인터페이스 구조
 interface WeightTrend {
   based_on?: string;
   slope?: number;
@@ -50,10 +49,6 @@ interface WeightTrend {
     min: number;
     max: number;
   };
-}
-
-interface PregnancyInfo {
-  week: number;
 }
 
 interface HealthReportResponse {
@@ -88,23 +83,13 @@ export default function WeightPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pregnancyError, setPregnancyError] = useState(false);
   const [trend, setTrend] = useState<WeightTrend | null>(null);
+  const [userBmi, setUserBmi] = useState<number>(22.5);
   const [healthReport, setHealthReport] = useState<string | null>(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
 
-  const fetchPregnancyInfo = async () => {
-    try {
-      const res = await getJson<PregnancyInfo>("/pregnancy/me");
-      setCurrentWeek(res.week);
-      setSelectedWeek(res.week);
-      setPregnancyError(false);
-      return res.week;
-    } catch {
-      setPregnancyError(true);
-      throw new Error("임신 정보를 불러올 수 없습니다.");
-    }
-  };
+  const fetchWeight = async (week?: number, passedBmi?: number) => {
+    setHealthReport(null);
 
-  const fetchWeight = async (week?: number, bmi?: number) => {
     try {
       const [weightRes, trendRes] = await Promise.allSettled([
         getJson<WeightResponse>("/pregnancy/weight"),
@@ -152,14 +137,17 @@ export default function WeightPage() {
         console.log("[trend response]", mappedTrend);
         setTrend(mappedTrend);
 
+        const targetBmi = passedBmi ?? userBmi;
+        const targetWeek = week ?? selectedWeek;
         const status = trendData?.current_position?.status || "정상 범위";
+
         setIsReportLoading(true);
         try {
           const aiRes = await postJson<HealthReportResponse>(
             "/ai/health-report",
             {
-              week: week,
-              bmi: bmi,
+              week: targetWeek,
+              bmi: targetBmi,
               weightStatus: status,
             },
           );
@@ -182,13 +170,14 @@ export default function WeightPage() {
     setPregnancyError(false);
     setLoading(true);
     try {
-      // 임신 정보를 가져와서 week와 bmi를 넘겨줌
       const res = await getJson<PregnancyInfo>("/pregnancy/me");
       setCurrentWeek(res.week);
       setSelectedWeek(res.week);
 
-      const userBmi = res.bmi;
-      await fetchWeight(res.week, userBmi);
+      const fetchedBmi = res.bmi || 22.5;
+      setUserBmi(fetchedBmi);
+
+      await fetchWeight(res.week, fetchedBmi);
     } catch {
       setPregnancyError(true);
       setLoading(false);
@@ -794,17 +783,6 @@ const WeekSelect = styled.select`
     opacity: 0.6;
     cursor: not-allowed;
   }
-`;
-
-const EarlyPregnancyTip = styled.div`
-  background: #faf5f3;
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  padding: ${({ theme }) => theme.spacing.md};
-  font-size: 12px;
-  line-height: 1.6;
-  color: ${({ theme }) => theme.colors.subtext || "#8b7e74"};
-  border: 1px dashed ${({ theme }) => theme.colors.sub || "#f0e8e5"};
-  margin-top: 4px;
 `;
 
 const StatusBadge = styled.span<{ statusType: StatusType }>`
