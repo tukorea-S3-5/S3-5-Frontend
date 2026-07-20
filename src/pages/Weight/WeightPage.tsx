@@ -252,22 +252,29 @@ export default function WeightPage() {
     <Container>
       {/* 이번 주 요약 카드 */}
       <SummaryCard>
-        <SectionLabel>이번 주 요약</SectionLabel>
-        {currentWeek <= 13 && (
-          <EarlyPregnancyTip>
-            💡 <b>임신 1분기(초기) 안내</b>
-            <br />이 시기에는 입덧과 식욕 저하 등으로 체중이 일시적으로
-            감소하거나 변화가 적을 수 있으니 안심하셔도 괜찮아요!
-          </EarlyPregnancyTip>
-        )}
-        <GainRow>
-          <GainLabel>총 증가량</GainLabel>
-          <GainValue>
+        <RecordTitle>이번 주 요약</RecordTitle>
+        <MainStatArea>
+          <StatTitle>현재까지 총 증가량</StatTitle>
+          <StatValue>
             {totalGain !== null
-              ? `${totalGain >= 0 ? "+" : ""}${totalGain.toFixed(1)}kg`
+              ? `${totalGain >= 0 ? "+" : ""}${totalGain.toFixed(1)}`
               : "-"}
-          </GainValue>
-        </GainRow>
+            <span className="unit">kg</span>
+          </StatValue>
+
+          {trend?.current_position?.range && (
+            <SubStatText>
+              이번 주 목표: {trend.current_position.range.min} ~{" "}
+              {trend.current_position.range.max}kg
+              <StatusBadge
+                statusType={getStatusType(trend.current_position.status)}
+              >
+                {trend.current_position.status}
+              </StatusBadge>
+            </SubStatText>
+          )}
+        </MainStatArea>
+
         {trend && (
           <TrendCard
             statusType={getStatusType(
@@ -302,6 +309,13 @@ export default function WeightPage() {
                 "상태 정보를 불러오는 중입니다."}
             </TrendStatus>
           </TrendCard>
+        )}
+        {currentWeek <= 13 && (
+          <EarlyPregnancyTip>
+            💡 <b>임신 1분기(초기) 안내</b>
+            <br />이 시기에는 입덧과 식욕 저하 등으로 체중이 일시적으로
+            감소하거나 변화가 적을 수 있으니 안심하셔도 괜찮아요!
+          </EarlyPregnancyTip>
         )}
       </SummaryCard>
 
@@ -504,28 +518,7 @@ const SummaryCard = styled.div`
   flex-direction: column;
   gap: ${({ theme }) => theme.spacing.md};
 `;
-const SectionLabel = styled.p`
-  ${({ theme }) => theme.typography.caption}
-  color: ${({ theme }) => theme.colors.subtext};
-  margin: 0 0 ${({ theme }) => theme.spacing.sm} 0;
-`;
-const GainRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: ${({ theme }) => theme.colors.light};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
-`;
-const GainLabel = styled.span`
-  ${({ theme }) => theme.typography.body2}
-  color: ${({ theme }) => theme.colors.text.primary};
-`;
-const GainValue = styled.span`
-  ${({ theme }) => theme.typography.body1}
-  font-weight: 700;
-  color: ${({ theme }) => theme.colors.point};
-`;
+
 const RecordCard = styled.div`
   background: ${({ theme }) => theme.colors.white};
   border-radius: ${({ theme }) => theme.borderRadius.lg};
@@ -766,4 +759,62 @@ const EarlyPregnancyTip = styled.div`
   color: ${({ theme }) => theme.colors.subtext || "#8b7e74"};
   border: 1px dashed ${({ theme }) => theme.colors.sub || "#f0e8e5"};
   margin-top: 4px;
+`;
+
+const StatusBadge = styled.span<{ statusType: StatusType }>`
+  padding: 4px 8px;
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
+  font-size: 11px;
+  font-weight: 700;
+  background: ${({ statusType }) =>
+    ({
+      normal: "#e8f5e9",
+      excessive: "#ffebee",
+      warning: "#fff8e1",
+    })[statusType]};
+  color: ${({ statusType }) =>
+    ({
+      normal: "#2e7d32",
+      excessive: "#c62828",
+      warning: "#f57f17",
+    })[statusType]};
+`;
+
+const MainStatArea = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* 가운데 정렬로 시선 집중 */
+  padding: ${({ theme }) => theme.spacing.lg} 0;
+  gap: 8px;
+`;
+
+const StatTitle = styled.span`
+  ${({ theme }) => theme.typography.body2}
+  color: ${({ theme }) => theme.colors.subtext};
+`;
+
+const StatValue = styled.div`
+  font-size: 36px;
+  font-weight: 800;
+  color: ${({ theme }) => theme.colors.point}; /* 메인 컬러로 포인트 */
+  line-height: 1;
+
+  .unit {
+    font-size: 18px;
+    font-weight: 600;
+    margin-left: 4px;
+    color: ${({ theme }) => theme.colors.text.primary};
+  }
+`;
+
+const SubStatText = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: ${({ theme }) => theme.colors.text.secondary};
+  background: ${({ theme }) => theme.colors.background};
+  padding: 6px 12px;
+  border-radius: 20px;
 `;

@@ -27,37 +27,13 @@ interface ReportResponse {
   max_heart_rate: number | null;
   status?: "COMPLETED" | "ABORTED" | string;
   exercises: ExerciseSummary[];
+  ai_comment?: string;
 }
 
 interface LocationState {
   sessionId?: number;
   heartRates?: number[];
 }
-
-// 만약에 llm에 이런 내용 추가한다고 하면 나중에 바꿔야 함
-const getComment = (avg: number | null, status?: string): string => {
-  if (status === "ABORTED") {
-    return "운동을 중간에 종료했지만, 진행한 구간의 기록은 저장되었어요. 몸 상태가 불편했다면 충분히 쉬어주세요.";
-  }
-
-  if (avg === null) {
-    return "심박수 데이터는 부족하지만, 운동 기록은 정상적으로 저장되었어요.";
-  }
-
-  if (avg >= 130) {
-    return "운동 강도가 꽤 높았어요! 다음엔 충분한 휴식을 취하세요. 💪";
-  }
-
-  if (avg >= 115) {
-    return "무리한 수준은 아니지만,\n다음에는 호흡을 조금 더 천천히 해보세요.";
-  }
-
-  if (avg >= 100) {
-    return "적절한 강도로 운동했어요! 오늘 수고했어요 🌸";
-  }
-
-  return "가볍고 안전하게 운동했어요. 꾸준히 하는 게 최고예요! 🤰";
-};
 
 const formatDuration = (seconds: number) => {
   if (!seconds) return "0분";
@@ -128,10 +104,7 @@ export default function ReportPage() {
         }
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        console.warn(
-          `[ReportPage] 실패 (${attempt}/${MAX_RETRY}):`,
-          message,
-        );
+        console.warn(`[ReportPage] 실패 (${attempt}/${MAX_RETRY}):`, message);
         if (attempt < MAX_RETRY && !cancelled) {
           setTimeout(() => fetchReport(attempt + 1), RETRY_DELAY);
         } else if (!cancelled) {
@@ -302,7 +275,7 @@ export default function ReportPage() {
           <CommentCard>
             <CommentTitle>오늘의 운동 한마디</CommentTitle>
             <CommentText>
-              {getComment(report.avg_heart_rate, report.status)}
+              {report.ai_comment || "오늘의 운동 리포트를 분석할 수 없습니다."}
             </CommentText>
           </CommentCard>
         </>

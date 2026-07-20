@@ -17,6 +17,7 @@ interface ExerciseFromAPI {
   description: string;
   difficulty_label: string;
   video_url?: string;
+  ai_comment?: string;
 }
 
 interface SessionResponse {
@@ -55,6 +56,7 @@ interface Exercise {
   category: string;
   difficulty: string;
   videoUrl: string;
+  aiComment?: string;
 }
 
 interface GuidelineResponse {
@@ -71,6 +73,7 @@ const toExercise = (e: ExerciseFromAPI): Exercise => ({
   category: e.category_name,
   difficulty: e.difficulty_label,
   videoUrl: e.video_url ?? "",
+  aiComment: e.ai_comment,
 });
 
 const TAB_KEYS = ["추천", "주의", "비추천"] as const;
@@ -280,6 +283,7 @@ const ExerciseListPage = () => {
               description={exercise.description}
               category={exercise.category}
               difficulty={exercise.difficulty}
+              aiComment={exercise.aiComment}
               selected={
                 selectedTab !== "비추천" &&
                 selectedExercises.includes(exercise.id)

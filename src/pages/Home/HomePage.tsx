@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
-import SymptomChecker from './components/SymptomChecker';
-import { getJson, postJson } from '../../api/http';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import styled from "styled-components";
+import SymptomChecker from "./components/SymptomChecker";
+import { getJson, postJson } from "../../api/http";
 
 interface Symptom {
   id: string;
@@ -27,9 +27,9 @@ interface WeeklyHealth {
 }
 
 const TRIMESTER_LABEL: Record<number, string> = {
-  1: '1분기',
-  2: '2분기',
-  3: '3분기',
+  1: "1분기",
+  2: "2분기",
+  3: "3분기",
 };
 
 export default function HomePage() {
@@ -41,40 +41,51 @@ export default function HomePage() {
 
   useEffect(() => {
     Promise.allSettled([
-      getJson<PregnancyInfo>('/pregnancy/me'),
-      getJson<WeeklyHealth>('/pregnancy/weekly-health'),
-    ]).then(([pregnancyRes, healthRes]) => {
-      console.log('[HomePage] pregnancy:', pregnancyRes);
-      console.log('[HomePage] weeklyHealth:', healthRes);
-      if (pregnancyRes.status === 'fulfilled') setPregnancy(pregnancyRes.value);
-      if (healthRes.status === 'fulfilled') setWeeklyHealth(healthRes.value);
-    }).finally(() => setLoading(false));
+      getJson<PregnancyInfo>("/pregnancy/me"),
+      getJson<WeeklyHealth>("/pregnancy/weekly-health"),
+    ])
+      .then(([pregnancyRes, healthRes]) => {
+        console.log("[HomePage] pregnancy:", pregnancyRes);
+        console.log("[HomePage] weeklyHealth:", healthRes);
+        if (pregnancyRes.status === "fulfilled")
+          setPregnancy(pregnancyRes.value);
+        if (healthRes.status === "fulfilled") setWeeklyHealth(healthRes.value);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const week = pregnancy?.week ?? 0;
   const remainingWeeks = Math.max(40 - week, 0);
   const progressPercentage = Math.min((week / 40) * 100, 100);
-  const trimesterLabel = TRIMESTER_LABEL[pregnancy?.trimester ?? 1] ?? '';
+  const trimesterLabel = TRIMESTER_LABEL[pregnancy?.trimester ?? 1] ?? "";
   const totalGain = pregnancy?.total_gain ?? 0;
   const dueDate = pregnancy?.due_date
-    ? new Date(pregnancy.due_date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
-    : '';
+    ? new Date(pregnancy.due_date).toLocaleDateString("ko-KR", {
+        month: "long",
+        day: "numeric",
+      })
+    : "";
 
   const handleSymptomSubmit = async (symptoms: Symptom[]) => {
-    const codes = symptoms.map(s => s.code);
+    const codes = symptoms.map((s) => s.code);
     try {
-      await postJson('/symptom', { symptoms: codes });
+      await postJson("/symptom", { symptoms: codes });
     } catch {
       // 실패해도 운동 목록으로 이동
     }
-    navigate('/exercises');
+    navigate("/exercises");
   };
 
   const handleNoSymptom = () => {
-    navigate('/exercises');
+    navigate("/exercises");
   };
 
-  if (loading) return <Container><LoadingText>불러오는 중...</LoadingText></Container>;
+  if (loading)
+    return (
+      <Container>
+        <LoadingText>불러오는 중...</LoadingText>
+      </Container>
+    );
 
   return (
     <Container>
@@ -82,13 +93,17 @@ export default function HomePage() {
         <PregnancyMeta>현재 임신</PregnancyMeta>
         <PregnancyWeek>{week}주차</PregnancyWeek>
         <PregnancyTrimester>
-          {trimesterLabel}{dueDate ? ` • 출산 예정일 ${dueDate}` : ''}
+          {trimesterLabel}
+          {dueDate ? ` • 출산 예정일 ${dueDate}` : ""}
         </PregnancyTrimester>
 
         <InfoRow>
           <InfoBox>
             <InfoLabel>⚡ 체중 증가</InfoLabel>
-            <InfoValue>{totalGain >= 0 ? '+' : ''}{totalGain.toFixed(1)}kg</InfoValue>
+            <InfoValue>
+              {totalGain >= 0 ? "+" : ""}
+              {totalGain.toFixed(1)}kg
+            </InfoValue>
           </InfoBox>
           <InfoBox>
             <InfoLabel>📅 출산까지</InfoLabel>
@@ -97,8 +112,12 @@ export default function HomePage() {
         </InfoRow>
 
         <ProgressRow>
-          <ProgressLabel>현재 <strong>{week}주차</strong></ProgressLabel>
-          <ProgressLabel>남은 기간 <strong>{remainingWeeks}주</strong></ProgressLabel>
+          <ProgressLabel>
+            현재 <strong>{week}주차</strong>
+          </ProgressLabel>
+          <ProgressLabel>
+            남은 기간 <strong>{remainingWeeks}주</strong>
+          </ProgressLabel>
         </ProgressRow>
         <ProgressBarTrack>
           <ProgressBarFill style={{ width: `${progressPercentage}%` }} />
@@ -115,8 +134,10 @@ export default function HomePage() {
           <HealthTitle>➕ 이번 주 건강 정보</HealthTitle>
 
           <HealthSection>
-            <HealthSectionLabel>권장 체중 증가</HealthSectionLabel>
-            <HealthSectionValue>{weeklyHealth.recommended_weight_gain}</HealthSectionValue>
+            <HealthSectionLabel>출산까지 총 권장 증가량</HealthSectionLabel>
+            <HealthSectionValue>
+              {weeklyHealth.recommended_weight_gain}
+            </HealthSectionValue>
           </HealthSection>
 
           <Divider />
@@ -185,7 +206,7 @@ const InfoRow = styled.div`
 const InfoBox = styled.div`
   flex: 1;
   min-width: 0;
-  background: rgba(255,255,255,0.6);
+  background: rgba(255, 255, 255, 0.6);
   border-radius: ${({ theme }) => theme.borderRadius.md};
   padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
   display: flex;
@@ -265,7 +286,8 @@ const Divider = styled.div`
 const HealthSectionTitle = styled.p<{ $accent?: boolean }>`
   ${({ theme }) => theme.typography.body1}
   font-weight: 700;
-  color: ${({ theme, $accent }) => $accent ? theme.colors.point : theme.colors.text.primary};
+  color: ${({ theme, $accent }) =>
+    $accent ? theme.colors.point : theme.colors.text.primary};
   margin: 0 0 ${({ theme }) => theme.spacing.sm} 0;
 `;
 const HealthList = styled.ul`
